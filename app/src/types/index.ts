@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'owner' | 'cashier';
+export type UserRole = "super_admin" | "tenant" | "cashier";
 
 export interface Tenant {
   id: string;
@@ -14,7 +14,7 @@ export interface ReceiptConfig {
   address: string;
   contact_number: string;
   footer_message: string;
-  paper_width: '80mm' | '58mm';
+  paper_width: "80mm" | "58mm";
   show_cashier_name: boolean;
   show_branch_name: boolean;
 }
@@ -89,8 +89,8 @@ export interface ProductIngredient {
   ingredient_unit?: string;
 }
 
-export type OrderStatus = 'completed' | 'voided';
-export type PaymentMethod = 'cash' | 'gcash' | 'maya';
+export type OrderStatus = "completed" | "voided";
+export type PaymentMethod = "cash" | "gcash" | "maya";
 
 export interface Order {
   id: string;
@@ -122,19 +122,23 @@ export interface InventoryLog {
   ingredient_id: string;
   ingredient_name: string;
   change_qty: number;
-  reason: 'order' | 'restock' | 'void_reversal' | 'adjustment';
+  reason: "order" | "restock" | "void_reversal" | "adjustment";
   triggered_by: string;
   created_at: string;
 }
 
-export type NotificationType = 'password_reset' | 'void_order' | 'low_stock' | 'new_order';
+export type NotificationType =
+  | "password_reset"
+  | "void_order"
+  | "low_stock"
+  | "new_order";
 
 export interface Notification {
   id: string;
   tenant_id: string;
   branch_id: string | null;
   type: NotificationType;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   payload: NotificationPayload;
   created_by: string;
   created_at: string;
@@ -169,5 +173,10 @@ export interface DashboardStats {
   paymentBreakdown: { method: PaymentMethod; amount: number; count: number }[];
   dailyRevenue: { date: string; amount: number }[];
   topProducts: { name: string; qty: number; revenue: number }[];
-  branchBreakdown: { branch_id: string; branch_name: string; revenue: number; orders: number }[];
+  branchBreakdown: {
+    branch_id: string;
+    branch_name: string;
+    revenue: number;
+    orders: number;
+  }[];
 }
