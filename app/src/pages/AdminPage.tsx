@@ -96,7 +96,9 @@ export function AdminPage() {
     { id: "categories", icon: LayoutGrid, label: "Categories" },
     { id: "ingredients", icon: ChefHat, label: "Ingredients" },
     { id: "branches", icon: Store, label: "Branches" },
-    { id: "cashiers", icon: Users, label: "Cashiers" },
+    ...(currentUser?.role === "tenant" || currentUser?.role === "super_admin"
+      ? [{ id: "cashiers", icon: Users, label: "Cashiers" } as const]
+      : []),
     { id: "receipt", icon: Receipt, label: "Receipt" },
     ...(currentUser?.role === "super_admin"
       ? [{ id: "tenants", icon: Building2, label: "Tenants" } as const]
@@ -183,9 +185,11 @@ export function AdminPage() {
         {activeTab === "branches" && (
           <AdminBranches tenantId={currentUser?.tenant_id || ""} />
         )}
-        {activeTab === "cashiers" && (
-          <CashierManagement tenantId={currentUser?.tenant_id || ""} />
-        )}
+        {activeTab === "cashiers" &&
+          (currentUser?.role === "tenant" ||
+            currentUser?.role === "super_admin") && (
+            <CashierManagement tenantId={currentUser?.tenant_id || ""} />
+          )}
         {activeTab === "receipt" && (
           <AdminReceipt tenantId={currentUser?.tenant_id || ""} />
         )}
