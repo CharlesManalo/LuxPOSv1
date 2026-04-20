@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useStore } from "@/stores/useStore";
 import { getTenant } from "@/lib/mockDb";
+import type { UserRole } from "@/types";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -21,18 +22,17 @@ export function LoginPage() {
   });
   const [password, setPassword] = useState("password");
   const [showPassword, setShowPassword] = useState(false);
-  const [activeRole, setActiveRole] = useState<"cashier" | "owner" | "admin">(
-    () => {
-      if (roleParam === "owner") return "owner";
-      if (roleParam === "admin") return "admin";
-      return "cashier";
-    },
-  );
+  const [activeRole, setActiveRole] = useState<UserRole>(() => {
+    if (roleParam === "owner") return "owner";
+    if (roleParam === "admin") return "admin";
+    return "cashier";
+  });
 
-  const handleRoleChange = (role: "cashier" | "owner" | "admin") => {
+  const handleRoleChange = (role: UserRole) => {
     setActiveRole(role);
-    if (role === "admin") setEmail("admin@luxpos.app");
-    else if (role === "owner") setEmail("juan@silogan.ph");
+    if (role === "admin" || role === "super_admin")
+      setEmail("admin@luxpos.app");
+    else if (role === "owner" || role === "tenant") setEmail("juan@silogan.ph");
     else setEmail("maria@silogan.ph");
   };
 
@@ -85,6 +85,18 @@ export function LoginPage() {
     admin: {
       icon: Shield,
       label: "Admin Access",
+      color: "bg-[#2c2c2c]",
+      desc: "System administration",
+    },
+    tenant: {
+      icon: Store,
+      label: "Tenant Login",
+      color: "bg-success-green",
+      desc: "Manage your business",
+    },
+    super_admin: {
+      icon: Shield,
+      label: "Super Admin Access",
       color: "bg-[#2c2c2c]",
       desc: "System administration",
     },
