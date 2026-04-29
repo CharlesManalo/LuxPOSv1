@@ -1,6 +1,5 @@
 import type {
   Tenant,
-  Branch,
   AppUser,
   Category,
   Product,
@@ -26,48 +25,15 @@ export const demoTenant: Tenant = {
     footer_message: "Maraming salamat po! Balik kayo ah!",
     paper_width: "80mm",
     show_cashier_name: true,
-    show_branch_name: true,
   },
   created_at: "2024-01-15T00:00:00Z",
 };
-
-// Demo Branches
-export const demoBranches: Branch[] = [
-  {
-    id: "branch-1",
-    tenant_id: "tenant-1",
-    name: "Main Branch",
-    address: "456 Mabini St., Batangas City",
-    manager_id: null,
-    is_active: true,
-    created_at: "2024-01-15T00:00:00Z",
-  },
-  {
-    id: "branch-2",
-    tenant_id: "tenant-1",
-    name: "Annex Branch",
-    address: "78 Poblacion Rd., Batangas City",
-    manager_id: null,
-    is_active: true,
-    created_at: "2024-03-01T00:00:00Z",
-  },
-  {
-    id: "branch-3",
-    tenant_id: "tenant-1",
-    name: "SM City Branch",
-    address: "SM City Batangas, Food Court Level 2",
-    manager_id: null,
-    is_active: true,
-    created_at: "2024-06-15T00:00:00Z",
-  },
-];
 
 // Demo Users
 export const demoUsers: AppUser[] = [
   {
     id: "admin-1",
     tenant_id: "system", // Super admin has no specific tenant
-    branch_id: null,
     role: "super_admin",
     full_name: "System Super Admin",
     email: "admin@luxpos.app",
@@ -77,7 +43,6 @@ export const demoUsers: AppUser[] = [
   {
     id: "tenant-1",
     tenant_id: "tenant-1",
-    branch_id: null,
     role: "tenant",
     full_name: "Juan Dela Cruz",
     email: "juan@silogan.ph",
@@ -87,7 +52,6 @@ export const demoUsers: AppUser[] = [
   {
     id: "cashier-1",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     role: "cashier",
     full_name: "Maria Santos",
     email: "maria@silogan.ph",
@@ -97,7 +61,6 @@ export const demoUsers: AppUser[] = [
   {
     id: "cashier-2",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     role: "cashier",
     full_name: "Pedro Reyes",
     email: "pedro@silogan.ph",
@@ -438,12 +401,11 @@ export const demoProductVariants: ProductVariant[] = [
   },
 ];
 
-// Demo Ingredients (per branch - Main Branch)
+// Demo Ingredients
 export const demoIngredients: Ingredient[] = [
   {
     id: "ing-1",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Beef Tapa",
     unit: "kg",
     stock_qty: 12.5,
@@ -453,7 +415,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-2",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Longganisa",
     unit: "kg",
     stock_qty: 8.3,
@@ -463,7 +424,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-3",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Bangus",
     unit: "kg",
     stock_qty: 3.2,
@@ -473,7 +433,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-4",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Chicken",
     unit: "kg",
     stock_qty: 15.0,
@@ -483,7 +442,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-5",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Hotdog",
     unit: "pcs",
     stock_qty: 48,
@@ -493,7 +451,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-6",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Rice",
     unit: "kg",
     stock_qty: 50,
@@ -503,7 +460,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-7",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Egg",
     unit: "pcs",
     stock_qty: 120,
@@ -513,7 +469,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-8",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Cooking Oil",
     unit: "L",
     stock_qty: 10,
@@ -523,7 +478,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-9",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Calamansi",
     unit: "kg",
     stock_qty: 2.5,
@@ -533,7 +487,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-10",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Barako Coffee",
     unit: "kg",
     stock_qty: 4.0,
@@ -543,7 +496,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-11",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Sugar",
     unit: "kg",
     stock_qty: 8,
@@ -553,18 +505,15 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-12",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     name: "Cheese",
     unit: "kg",
     stock_qty: 4.5,
     low_stock_threshold: 2,
     created_at: "2024-01-15T00:00:00Z",
   },
-  // Annex Branch ingredients
   {
     id: "ing-13",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     name: "Beef Tapa",
     unit: "kg",
     stock_qty: 6.0,
@@ -574,7 +523,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-14",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     name: "Longganisa",
     unit: "kg",
     stock_qty: 4.0,
@@ -584,7 +532,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-15",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     name: "Rice",
     unit: "kg",
     stock_qty: 35,
@@ -594,7 +541,6 @@ export const demoIngredients: Ingredient[] = [
   {
     id: "ing-16",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     name: "Egg",
     unit: "pcs",
     stock_qty: 80,
@@ -723,12 +669,6 @@ function generateDemoOrders(): Order[] {
     orders.push({
       id: `order-${i + 1}`,
       tenant_id: "tenant-1",
-      branch_id:
-        Math.random() > 0.4
-          ? "branch-1"
-          : Math.random() > 0.5
-            ? "branch-2"
-            : "branch-3",
       cashier_id: Math.random() > 0.5 ? "cashier-1" : "cashier-2",
       status: i < 45 ? "completed" : "voided",
       payment_method: methods[Math.floor(Math.random() * 3)],
@@ -805,7 +745,6 @@ export const demoInventoryLogs: InventoryLog[] = [
   {
     id: "log-1",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     ingredient_id: "ing-1",
     ingredient_name: "Beef Tapa",
     change_qty: -1.5,
@@ -816,7 +755,6 @@ export const demoInventoryLogs: InventoryLog[] = [
   {
     id: "log-2",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     ingredient_id: "ing-6",
     ingredient_name: "Rice",
     change_qty: -5.0,
@@ -827,7 +765,6 @@ export const demoInventoryLogs: InventoryLog[] = [
   {
     id: "log-3",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     ingredient_id: "ing-7",
     ingredient_name: "Egg",
     change_qty: -24,
@@ -838,7 +775,6 @@ export const demoInventoryLogs: InventoryLog[] = [
   {
     id: "log-4",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     ingredient_id: "ing-1",
     ingredient_name: "Beef Tapa",
     change_qty: 10,
@@ -849,7 +785,6 @@ export const demoInventoryLogs: InventoryLog[] = [
   {
     id: "log-5",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     ingredient_id: "ing-3",
     ingredient_name: "Bangus",
     change_qty: -0.8,
@@ -860,7 +795,6 @@ export const demoInventoryLogs: InventoryLog[] = [
   {
     id: "log-6",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     ingredient_id: "ing-13",
     ingredient_name: "Beef Tapa",
     change_qty: -0.6,
@@ -871,7 +805,6 @@ export const demoInventoryLogs: InventoryLog[] = [
   {
     id: "log-7",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     ingredient_id: "ing-15",
     ingredient_name: "Rice",
     change_qty: -3.0,
@@ -882,7 +815,6 @@ export const demoInventoryLogs: InventoryLog[] = [
   {
     id: "log-8",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     ingredient_id: "ing-7",
     ingredient_name: "Egg",
     change_qty: 60,
@@ -897,14 +829,12 @@ export const demoNotifications: Notification[] = [
   {
     id: "notif-1",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     type: "password_reset",
     status: "pending",
     payload: {
       title: "Password Reset Request",
       message: "Maria Santos requested a password reset",
       cashier_name: "Maria Santos",
-      branch_name: "Main Branch",
     },
     created_by: "cashier-1",
     created_at: "2026-04-19T08:00:00Z",
@@ -912,7 +842,6 @@ export const demoNotifications: Notification[] = [
   {
     id: "notif-2",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     type: "void_order",
     status: "pending",
     payload: {
@@ -920,7 +849,6 @@ export const demoNotifications: Notification[] = [
       message: "Request to void Order #1234",
       order_id: "order-5",
       cashier_name: "Maria Santos",
-      branch_name: "Main Branch",
       amount: 180,
     },
     created_by: "cashier-1",
@@ -929,14 +857,12 @@ export const demoNotifications: Notification[] = [
   {
     id: "notif-3",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     type: "low_stock",
     status: "pending",
     payload: {
       title: "Low Stock Alert",
       message: "Bangus stock is below threshold",
       ingredient_name: "Bangus",
-      branch_name: "Annex Branch",
     },
     created_by: "cashier-2",
     created_at: "2026-04-19T07:30:00Z",
@@ -944,14 +870,12 @@ export const demoNotifications: Notification[] = [
   {
     id: "notif-4",
     tenant_id: "tenant-1",
-    branch_id: "branch-1",
     type: "new_order",
     status: "pending",
     payload: {
       title: "New Order",
       message: "Order #1238 received",
       order_id: "order-8",
-      branch_name: "Main Branch",
       amount: 250,
     },
     created_by: "cashier-1",
@@ -960,14 +884,12 @@ export const demoNotifications: Notification[] = [
   {
     id: "notif-5",
     tenant_id: "tenant-1",
-    branch_id: "branch-2",
     type: "password_reset",
     status: "approved",
     payload: {
       title: "Password Reset Request",
       message: "Pedro Reyes requested a password reset",
       cashier_name: "Pedro Reyes",
-      branch_name: "Annex Branch",
     },
     created_by: "cashier-2",
     created_at: "2026-04-18T16:00:00Z",
@@ -979,7 +901,6 @@ const STORAGE_KEY = "luxpos_data";
 
 export interface StoredData {
   tenants: Tenant[];
-  branches: Branch[];
   users: AppUser[];
   categories: Category[];
   products: Product[];
@@ -995,7 +916,6 @@ export interface StoredData {
 function getDefaultData(): StoredData {
   return {
     tenants: [demoTenant],
-    branches: demoBranches,
     users: demoUsers,
     categories: demoCategories,
     products: demoProducts,

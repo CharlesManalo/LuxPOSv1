@@ -14,8 +14,6 @@ import {
   ChevronRight,
   Trash2,
   ImageIcon,
-  ToggleLeft,
-  ToggleRight,
   AlertTriangle,
   Check,
   Pencil,
@@ -37,7 +35,6 @@ import {
   getCategories,
   getProducts,
   getIngredients,
-  getBranches,
   createCategory,
   updateCategory,
   deleteCategory,
@@ -46,8 +43,6 @@ import {
   deleteProduct,
   createIngredient,
   deleteIngredient,
-  createBranch,
-  updateBranch,
   getProductVariants,
   createVariant,
   updateVariant,
@@ -58,7 +53,6 @@ import type {
   Category,
   Product,
   Ingredient,
-  Branch,
   ProductVariant,
   ReceiptConfig,
 } from "@/types";
@@ -796,7 +790,6 @@ function TenantManagement() {
         footer_message: "Thank you!",
         paper_width: "80mm",
         show_cashier_name: true,
-        show_branch_name: true,
       },
     });
 
@@ -1128,25 +1121,17 @@ function AdminCategories({ tenantId }: { tenantId: string }) {
 // ─── Admin Ingredients ───
 function AdminIngredients({ tenantId }: { tenantId: string }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newIng, setNewIng] = useState({
     name: "",
     unit: "",
     stock_qty: 0,
     low_stock_threshold: 0,
-    branch_id: "",
   });
 
   const load = useCallback(async () => {
-    const [ings, brs] = await Promise.all([
-      getIngredients(tenantId),
-      getBranches(tenantId),
-    ]);
+    const ings = await getIngredients(tenantId);
     setIngredients(ings);
-    setBranches(brs);
-    if (brs.length > 0 && !newIng.branch_id)
-      setNewIng((p) => ({ ...p, branch_id: brs[0].id }));
   }, [tenantId]);
 
   useEffect(() => {
@@ -1154,10 +1139,9 @@ function AdminIngredients({ tenantId }: { tenantId: string }) {
   }, [load]);
 
   const handleAdd = async () => {
-    if (!newIng.name.trim() || !newIng.branch_id) return;
+    if (!newIng.name.trim()) return;
     await createIngredient({
       tenant_id: tenantId,
-      branch_id: newIng.branch_id,
       name: newIng.name.trim(),
       unit: newIng.unit || "pcs",
       stock_qty: Number(newIng.stock_qty),
@@ -1168,7 +1152,6 @@ function AdminIngredients({ tenantId }: { tenantId: string }) {
       unit: "",
       stock_qty: 0,
       low_stock_threshold: 0,
-      branch_id: branches[0]?.id || "",
     });
     setIsAdding(false);
     load();
@@ -1188,7 +1171,7 @@ function AdminIngredients({ tenantId }: { tenantId: string }) {
             Ingredients
           </h1>
           <p className="text-sm text-muted-foreground">
-            {ingredients.length} items across all branches
+            {ingredients.length} items
           </p>
         </div>
         <Button
@@ -1236,21 +1219,8 @@ function AdminIngredients({ tenantId }: { tenantId: string }) {
                   low_stock_threshold: Number(e.target.value),
                 })
               }
-              className="rounded-xl"
+              className="rounded-xl col-span-2"
             />
-            <select
-              value={newIng.branch_id}
-              onChange={(e) =>
-                setNewIng({ ...newIng, branch_id: e.target.value })
-              }
-              className="rounded-xl border border-[#e0e0e0] px-3 text-sm"
-            >
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
           </div>
           <div className="flex gap-2">
             <Button
@@ -1275,7 +1245,6 @@ function AdminIngredients({ tenantId }: { tenantId: string }) {
           <thead className="bg-[#f5f5f5]">
             <tr className="text-left text-xs font-medium text-muted-foreground uppercase">
               <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Branch</th>
               <th className="px-4 py-3">Stock</th>
               <th className="px-4 py-3">Threshold</th>
               <th className="px-4 py-3">Status</th>
@@ -1284,14 +1253,10 @@ function AdminIngredients({ tenantId }: { tenantId: string }) {
           </thead>
           <tbody className="divide-y divide-[#e0e0e0]">
             {ingredients.map((ing) => {
-              const branch = branches.find((b) => b.id === ing.branch_id);
               const isLow = ing.stock_qty <= ing.low_stock_threshold;
               return (
                 <tr key={ing.id} className="hover:bg-[#f5f5f5]/50">
                   <td className="px-4 py-3 font-medium">{ing.name}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    {branch?.name || "Unknown"}
-                  </td>
                   <td className="px-4 py-3 font-mono text-sm">
                     {ing.stock_qty} {ing.unit}
                   </td>
@@ -1333,7 +1298,6 @@ function AdminReceipt({ tenantId }: { tenantId: string }) {
     footer_message: "",
     paper_width: "80mm",
     show_cashier_name: true,
-    show_branch_name: true,
   });
   const [enabled, setEnabled] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
@@ -1468,15 +1432,6 @@ function AdminReceipt({ tenantId }: { tenantId: string }) {
                   checked={config.show_cashier_name}
                   onCheckedChange={(checked) =>
                     setConfig({ ...config, show_cashier_name: checked })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Show branch name on receipt</span>
-                <Switch
-                  checked={config.show_branch_name}
-                  onCheckedChange={(checked) =>
-                    setConfig({ ...config, show_branch_name: checked })
                   }
                 />
               </div>

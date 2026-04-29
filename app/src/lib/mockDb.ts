@@ -1,12 +1,10 @@
 import type {
   Tenant,
-  Branch,
   AppUser,
   Category,
   Product,
   ProductVariant,
   Ingredient,
-  ProductIngredient,
   Order,
   OrderItem,
   InventoryLog,
@@ -45,7 +43,6 @@ export async function createTenant(tenantData: {
   const newTenantUser: AppUser = {
     id: generateId("user"),
     tenant_id: newTenant.id,
-    branch_id: null,
     role: "tenant",
     full_name: tenantData.name + " Owner",
     email: `${tenantData.slug}@tenant.app`,
@@ -69,7 +66,6 @@ export async function deleteTenant(tenantId: string): Promise<void> {
   setStoredData({
     tenants: data.tenants.filter((t) => t.id !== tenantId),
     users: data.users.filter((u) => u.tenant_id !== tenantId),
-    branches: data.branches.filter((b) => b.tenant_id !== tenantId),
     categories: data.categories.filter((c) => c.tenant_id !== tenantId),
     products: data.products.filter((p) => p.tenant_id !== tenantId),
     productVariants: data.productVariants.filter((pv) => {
@@ -118,13 +114,13 @@ export async function signIn(
     }
     if (email === "maria@silogan.ph") {
       const cashier = data.users.find(
-        (u) => u.role === "cashier" && u.branch_id === "branch-1",
+        (u) => u.role === "cashier" && u.tenant_id === "tenant-1",
       );
       return { user: cashier || null, error: null };
     }
     if (email === "pedro@silogan.ph") {
       const cashier = data.users.find(
-        (u) => u.role === "cashier" && u.branch_id === "branch-2",
+        (u) => u.role === "cashier" && u.tenant_id === "tenant-1",
       );
       return { user: cashier || null, error: null };
     }
@@ -156,7 +152,6 @@ export async function getCashiers(tenantId: string): Promise<AppUser[]> {
 
 export async function createCashier(cashierData: {
   tenant_id: string;
-  branch_id: string | null;
   full_name: string;
   email: string;
 }): Promise<AppUser> {
@@ -165,7 +160,6 @@ export async function createCashier(cashierData: {
   const newCashier: AppUser = {
     id: generateId("user"),
     tenant_id: cashierData.tenant_id,
-    branch_id: cashierData.branch_id,
     role: "cashier",
     full_name: cashierData.full_name,
     email: cashierData.email,
@@ -199,45 +193,6 @@ export async function updateTenant(
   data.tenants[idx] = { ...data.tenants[idx], ...updates };
   setStoredData({ tenants: data.tenants });
   return data.tenants[idx];
-}
-
-// Branches
-export async function getBranches(tenantId: string): Promise<Branch[]> {
-  await delay(200);
-  return getStoredData().branches.filter((b) => b.tenant_id === tenantId);
-}
-
-export async function getBranch(id: string): Promise<Branch | null> {
-  await delay(150);
-  return getStoredData().branches.find((b) => b.id === id) || null;
-}
-
-export async function createBranch(
-  branch: Omit<Branch, "id" | "created_at">,
-): Promise<Branch> {
-  await delay(300);
-  const data = getStoredData();
-  const newBranch: Branch = {
-    ...branch,
-    id: generateId("branch"),
-    created_at: new Date().toISOString(),
-  };
-  data.branches.push(newBranch);
-  setStoredData({ branches: data.branches });
-  return newBranch;
-}
-
-export async function updateBranch(
-  id: string,
-  updates: Partial<Branch>,
-): Promise<Branch> {
-  await delay(300);
-  const data = getStoredData();
-  const idx = data.branches.findIndex((b) => b.id === id);
-  if (idx === -1) throw new Error("Branch not found");
-  data.branches[idx] = { ...data.branches[idx], ...updates };
-  setStoredData({ branches: data.branches });
-  return data.branches[idx];
 }
 
 // Categories
@@ -394,17 +349,11 @@ export async function deleteVariant(id: string): Promise<void> {
 }
 
 // Ingredients
-export async function getIngredients(
-  tenantId: string,
-  branchId?: string,
-): Promise<Ingredient[]> {
+export async function getIngredients(tenantId: string): Promise<Ingredient[]> {
   await delay(200);
   let ingredients = getStoredData().ingredients.filter(
     (i) => i.tenant_id === tenantId,
   );
-  if (branchId) {
-    ingredients = ingredients.filter((i) => i.branch_id === branchId);
-  }
   return ingredients;
 }
 
@@ -414,7 +363,11 @@ export async function createIngredient(
   await delay(300);
   const data = getStoredData();
   const newIng: Ingredient = {
-    ...ingredient,
+    tenant_id: ingredient.tenant_id,
+    name: ingredient.name,
+    unit: ingredient.unit,
+    stock_qty: ingredient.stock_qty,
+    low_stock_threshold: ingredient.low_stock_threshold,
     id: generateId("ing"),
     created_at: new Date().toISOString(),
   };
@@ -449,47 +402,13 @@ export async function deleteIngredient(id: string): Promise<void> {
   });
 }
 
-// Product Ingredients
-export async function getProductIngredients(
-  productId: string,
-): Promise<ProductIngredient[]> {
-  await delay(150);
-  return getStoredData().productIngredients.filter(
-    (pi) => pi.product_id === productId,
-  );
-}
-
-export async function setProductIngredients(
-  productId: string,
-  ingredients: { ingredient_id: string; qty_required: number }[],
-): Promise<void> {
-  await delay(300);
-  const data = getStoredData();
-  data.productIngredients = data.productIngredients.filter(
-    (pi) => pi.product_id !== productId,
-  );
-  for (const ing of ingredients) {
-    data.productIngredients.push({
-      id: generateId("pi"),
-      product_id: productId,
-      ingredient_id: ing.ingredient_id,
-      qty_required: ing.qty_required,
-    });
-  }
-  setStoredData({ productIngredients: data.productIngredients });
-}
-
 // Orders
 export async function getOrders(
   tenantId: string,
-  branchId?: string,
   limit?: number,
 ): Promise<Order[]> {
   await delay(200);
   let orders = getStoredData().orders.filter((o) => o.tenant_id === tenantId);
-  if (branchId) {
-    orders = orders.filter((o) => o.branch_id === branchId);
-  }
   orders = orders.sort(
     (a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -502,11 +421,9 @@ export async function getOrder(id: string): Promise<Order | null> {
   await delay(150);
   const order = getStoredData().orders.find((o) => o.id === id);
   if (!order) return null;
-  const branch = getStoredData().branches.find((b) => b.id === order.branch_id);
   const cashier = getStoredData().users.find((u) => u.id === order.cashier_id);
   return {
     ...order,
-    branch_name: branch?.name,
     cashier_name: cashier?.full_name,
   };
 }
@@ -518,7 +435,11 @@ export async function createOrder(
   await delay(400);
   const data = getStoredData();
   const newOrder: Order = {
-    ...order,
+    tenant_id: order.tenant_id,
+    cashier_id: order.cashier_id,
+    status: order.status,
+    payment_method: order.payment_method,
+    total: order.total,
     id: generateId("order"),
     created_at: new Date().toISOString(),
   };
@@ -538,7 +459,7 @@ export async function createOrder(
     );
     for (const pi of prodIngredients) {
       const ingredient = data.ingredients.find(
-        (i) => i.id === pi.ingredient_id && i.branch_id === order.branch_id,
+        (i) => i.id === pi.ingredient_id && i.tenant_id === order.tenant_id,
       );
       if (ingredient) {
         const deduction = pi.qty_required * item.qty;
@@ -546,7 +467,6 @@ export async function createOrder(
         data.inventoryLogs.push({
           id: generateId("log"),
           tenant_id: order.tenant_id,
-          branch_id: order.branch_id,
           ingredient_id: ingredient.id,
           ingredient_name: ingredient.name,
           change_qty: -deduction,
@@ -589,7 +509,7 @@ export async function voidOrder(
     );
     for (const pi of prodIngredients) {
       const ingredient = data.ingredients.find(
-        (i) => i.id === pi.ingredient_id && i.branch_id === order.branch_id,
+        (i) => i.id === pi.ingredient_id && i.tenant_id === order.tenant_id,
       );
       if (ingredient) {
         const restoration = pi.qty_required * item.qty;
@@ -597,7 +517,6 @@ export async function voidOrder(
         data.inventoryLogs.push({
           id: generateId("log"),
           tenant_id: order.tenant_id,
-          branch_id: order.branch_id,
           ingredient_id: ingredient.id,
           ingredient_name: ingredient.name,
           change_qty: restoration,
@@ -626,15 +545,11 @@ export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
 // Inventory
 export async function getInventoryLogs(
   tenantId: string,
-  branchId?: string,
 ): Promise<InventoryLog[]> {
   await delay(200);
   let logs = getStoredData().inventoryLogs.filter(
     (l) => l.tenant_id === tenantId,
   );
-  if (branchId) {
-    logs = logs.filter((l) => l.branch_id === branchId);
-  }
   return logs.sort(
     (a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -654,7 +569,6 @@ export async function restockIngredient(
   data.inventoryLogs.push({
     id: generateId("log"),
     tenant_id: data.ingredients[idx].tenant_id,
-    branch_id: data.ingredients[idx].branch_id,
     ingredient_id: ingredientId,
     ingredient_name: data.ingredients[idx].name,
     change_qty: qty,
@@ -672,17 +586,11 @@ export async function restockIngredient(
 // Notifications
 export async function getNotifications(
   tenantId: string,
-  branchId?: string,
 ): Promise<Notification[]> {
   await delay(200);
   let notifs = getStoredData().notifications.filter(
     (n) => n.tenant_id === tenantId,
   );
-  if (branchId) {
-    notifs = notifs.filter(
-      (n) => n.branch_id === branchId || n.branch_id === null,
-    );
-  }
   return notifs.sort(
     (a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -734,17 +642,10 @@ export interface DashboardStats {
   paymentBreakdown: { method: PaymentMethod; amount: number; count: number }[];
   dailyRevenue: { date: string; amount: number }[];
   topProducts: { name: string; qty: number; revenue: number }[];
-  branchBreakdown: {
-    branch_id: string;
-    branch_name: string;
-    revenue: number;
-    orders: number;
-  }[];
 }
 
 export async function getDashboardStats(
   tenantId: string,
-  branchId?: string,
   days: number = 30,
 ): Promise<DashboardStats> {
   await delay(300);
@@ -758,7 +659,6 @@ export async function getDashboardStats(
       o.status === "completed" &&
       new Date(o.created_at) >= cutoff,
   );
-  if (branchId) orders = orders.filter((o) => o.branch_id === branchId);
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
   const totalOrders = orders.length;
@@ -767,8 +667,6 @@ export async function getDashboardStats(
   ).length;
 
   let ingredients = data.ingredients.filter((i) => i.tenant_id === tenantId);
-  if (branchId)
-    ingredients = ingredients.filter((i) => i.branch_id === branchId);
   const lowStockCount = ingredients.filter(
     (i) => i.stock_qty <= i.low_stock_threshold,
   ).length;
@@ -818,18 +716,6 @@ export async function getDashboardStats(
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  // Branch breakdown
-  const branchData = data.branches.filter((b) => b.tenant_id === tenantId);
-  const branchBreakdown = branchData.map((b) => {
-    const bOrders = orders.filter((o) => o.branch_id === b.id);
-    return {
-      branch_id: b.id,
-      branch_name: b.name,
-      revenue: bOrders.reduce((s, o) => s + o.total, 0),
-      orders: bOrders.length,
-    };
-  });
-
   return {
     totalRevenue,
     totalOrders,
@@ -838,7 +724,6 @@ export async function getDashboardStats(
     paymentBreakdown,
     dailyRevenue,
     topProducts,
-    branchBreakdown,
   };
 }
 

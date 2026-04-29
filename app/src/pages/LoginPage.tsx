@@ -13,7 +13,7 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const roleParam = searchParams.get("role");
   const { login, error, isLoading } = useAuth();
-  const { setCurrentTenant, setCurrentBranch, setBranches } = useStore();
+  const { setCurrentTenant } = useStore();
 
   const [email, setEmail] = useState(() => {
     if (roleParam === "owner") return "juan@silogan.ph";
@@ -54,14 +54,6 @@ export function LoginPage() {
           const tenant = await getTenant(user.tenant_id);
           if (tenant) {
             setCurrentTenant(tenant);
-            setBranches([]);
-            const { getBranches } = await import("@/lib/mockDb");
-            const branches = await getBranches(user.tenant_id);
-            setBranches(branches);
-            const userBranch = branches.find(
-              (b: { id: string }) => b.id === user.branch_id,
-            );
-            if (userBranch) setCurrentBranch(userBranch);
           }
           navigate("/cashier");
         }

@@ -1,5 +1,13 @@
-import { create } from 'zustand';
-import type { AppUser, Tenant, Branch, Category, Product, ProductVariant, CartItem, ReceiptConfig } from '@/types';
+import { create } from "zustand";
+import type {
+  AppUser,
+  Tenant,
+  Category,
+  Product,
+  ProductVariant,
+  CartItem,
+  ReceiptConfig,
+} from "@/types";
 
 interface AppState {
   // Auth
@@ -9,13 +17,9 @@ interface AppState {
   setUser: (user: AppUser | null) => void;
   setLoading: (loading: boolean) => void;
 
-  // Tenant/Branch context
+  // Tenant context
   currentTenant: Tenant | null;
-  currentBranch: Branch | null;
-  branches: Branch[];
   setCurrentTenant: (tenant: Tenant | null) => void;
-  setCurrentBranch: (branch: Branch | null) => void;
-  setBranches: (branches: Branch[]) => void;
 
   // Admin panel state
   adminActiveTenant: Tenant | null;
@@ -52,13 +56,12 @@ interface AppState {
 }
 
 const defaultReceiptConfig: ReceiptConfig = {
-  header_text: 'LuxPOS Restaurant',
-  address: '123 Main Street',
-  contact_number: '+63 912 345 6789',
-  footer_message: 'Thank you! Come again.',
-  paper_width: '80mm',
+  header_text: "LuxPOS Restaurant",
+  address: "123 Main Street",
+  contact_number: "+63 912 345 6789",
+  footer_message: "Thank you! Come again.",
+  paper_width: "80mm",
   show_cashier_name: true,
-  show_branch_name: true,
 };
 
 export const useStore = create<AppState>((set, get) => ({
@@ -69,17 +72,13 @@ export const useStore = create<AppState>((set, get) => ({
   setUser: (user) => set({ currentUser: user, isAuthenticated: !!user }),
   setLoading: (loading) => set({ isLoading: loading }),
 
-  // Tenant/Branch
+  // Tenant
   currentTenant: null,
-  currentBranch: null,
-  branches: [],
   setCurrentTenant: (tenant) => set({ currentTenant: tenant }),
-  setCurrentBranch: (branch) => set({ currentBranch: branch }),
-  setBranches: (branches) => set({ branches }),
 
   // Admin
   adminActiveTenant: null,
-  adminActiveTab: 'products',
+  adminActiveTab: "products",
   setAdminActiveTenant: (tenant) => set({ adminActiveTenant: tenant }),
   setAdminActiveTab: (tab) => set({ adminActiveTab: tab }),
 
@@ -98,14 +97,15 @@ export const useStore = create<AppState>((set, get) => ({
   addToCart: (item) => {
     const { cart } = get();
     const existing = cart.find(
-      (c) => c.product_id === item.product_id && c.variant_id === item.variant_id
+      (c) =>
+        c.product_id === item.product_id && c.variant_id === item.variant_id,
     );
     if (existing) {
       set({
         cart: cart.map((c) =>
           c.product_id === item.product_id && c.variant_id === item.variant_id
             ? { ...c, qty: c.qty + 1 }
-            : c
+            : c,
         ),
       });
     } else {
@@ -113,7 +113,11 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   removeFromCart: (productId, variantId) => {
-    set({ cart: get().cart.filter((c) => !(c.product_id === productId && c.variant_id === variantId)) });
+    set({
+      cart: get().cart.filter(
+        (c) => !(c.product_id === productId && c.variant_id === variantId),
+      ),
+    });
   },
   updateQty: (productId, qty, variantId) => {
     if (qty <= 0) {
@@ -122,12 +126,15 @@ export const useStore = create<AppState>((set, get) => ({
     }
     set({
       cart: get().cart.map((c) =>
-        c.product_id === productId && c.variant_id === variantId ? { ...c, qty } : c
+        c.product_id === productId && c.variant_id === variantId
+          ? { ...c, qty }
+          : c,
       ),
     });
   },
   clearCart: () => set({ cart: [] }),
-  getCartTotal: () => get().cart.reduce((sum, item) => sum + item.price * item.qty, 0),
+  getCartTotal: () =>
+    get().cart.reduce((sum, item) => sum + item.price * item.qty, 0),
   getCartCount: () => get().cart.reduce((sum, item) => sum + item.qty, 0),
 
   // Notifications

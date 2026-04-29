@@ -1,6 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
-export function useRealtimeOrders(tenantId: string | null, callback: (order: Record<string, unknown>) => void) {
+export function useRealtimeOrders(
+  tenantId: string | null,
+  callback: (order: Record<string, unknown>) => void,
+) {
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
@@ -21,7 +24,10 @@ export function useRealtimeOrders(tenantId: string | null, callback: (order: Rec
   }, [tenantId]);
 }
 
-export function useRealtimeNotifications(tenantId: string | null, callback: (notif: Record<string, unknown>) => void) {
+export function useRealtimeNotifications(
+  tenantId: string | null,
+  callback: (notif: Record<string, unknown>) => void,
+) {
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
@@ -32,32 +38,12 @@ export function useRealtimeNotifications(tenantId: string | null, callback: (not
         callbackRef.current({
           id: `notif-${Date.now()}`,
           tenant_id: tenantId,
-          type: 'new_order',
-          status: 'pending',
+          type: "new_order",
+          status: "pending",
           created_at: new Date().toISOString(),
         });
       }
     }, 8000);
     return () => clearInterval(interval);
   }, [tenantId]);
-}
-
-export function useRealtimeInventory(branchId: string | null, callback: (ingredient: Record<string, unknown>) => void) {
-  const callbackRef = useRef(callback);
-  callbackRef.current = callback;
-
-  useEffect(() => {
-    if (!branchId) return;
-    const interval = setInterval(() => {
-      if (Math.random() > 0.98) {
-        callbackRef.current({
-          id: `ing-${Date.now()}`,
-          branch_id: branchId,
-          stock_qty: Math.random() * 5,
-          low_stock_threshold: 3,
-        });
-      }
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [branchId]);
 }

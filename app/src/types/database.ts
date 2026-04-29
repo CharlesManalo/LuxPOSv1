@@ -16,27 +16,10 @@ export interface Database {
         >;
         Update: Partial<Database["public"]["Tables"]["tenants"]["Insert"]>;
       };
-      branches: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          name: string;
-          address: string;
-          manager_id: string | null;
-          is_active: boolean;
-          created_at: string;
-        };
-        Insert: Omit<
-          Database["public"]["Tables"]["branches"]["Row"],
-          "id" | "created_at"
-        >;
-        Update: Partial<Database["public"]["Tables"]["branches"]["Insert"]>;
-      };
       users: {
         Row: {
           id: string;
           tenant_id: string;
-          branch_id: string | null;
           role: "super_admin" | "tenant" | "cashier";
           full_name: string;
           email: string;
@@ -67,7 +50,6 @@ export interface Database {
         Row: {
           id: string;
           tenant_id: string;
-          branch_id: string;
           name: string;
           unit: string;
           stock_qty: number;
@@ -134,7 +116,6 @@ export interface Database {
         Row: {
           id: string;
           tenant_id: string;
-          branch_id: string;
           cashier_id: string;
           status: "completed" | "voided";
           payment_method: "cash" | "gcash" | "maya";
@@ -164,7 +145,6 @@ export interface Database {
         Row: {
           id: string;
           tenant_id: string;
-          branch_id: string;
           ingredient_id: string;
           ingredient_name: string;
           change_qty: number;
@@ -184,7 +164,6 @@ export interface Database {
         Row: {
           id: string;
           tenant_id: string;
-          branch_id: string | null;
           type: "password_reset" | "void_order" | "low_stock" | "new_order";
           status: "pending" | "approved" | "rejected";
           payload: Record<string, unknown>;

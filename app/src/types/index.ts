@@ -16,23 +16,11 @@ export interface ReceiptConfig {
   footer_message: string;
   paper_width: "80mm" | "58mm";
   show_cashier_name: boolean;
-  show_branch_name: boolean;
-}
-
-export interface Branch {
-  id: string;
-  tenant_id: string;
-  name: string;
-  address: string;
-  manager_id: string | null;
-  is_active: boolean;
-  created_at: string;
 }
 
 export interface AppUser {
   id: string;
   tenant_id: string;
-  branch_id: string | null;
   role: UserRole;
   full_name: string;
   email: string;
@@ -51,7 +39,6 @@ export interface Category {
 export interface Ingredient {
   id: string;
   tenant_id: string;
-  branch_id: string;
   name: string;
   unit: string;
   stock_qty: number;
@@ -95,10 +82,8 @@ export type PaymentMethod = "cash" | "gcash" | "maya";
 export interface Order {
   id: string;
   tenant_id: string;
-  branch_id: string;
   cashier_id: string;
   cashier_name?: string;
-  branch_name?: string;
   status: OrderStatus;
   payment_method: PaymentMethod;
   total: number;
@@ -118,7 +103,6 @@ export interface OrderItem {
 export interface InventoryLog {
   id: string;
   tenant_id: string;
-  branch_id: string;
   ingredient_id: string;
   ingredient_name: string;
   change_qty: number;
@@ -136,7 +120,6 @@ export type NotificationType =
 export interface Notification {
   id: string;
   tenant_id: string;
-  branch_id: string | null;
   type: NotificationType;
   status: "pending" | "approved" | "rejected";
   payload: NotificationPayload;
@@ -151,7 +134,6 @@ export interface NotificationPayload {
   ingredient_id?: string;
   ingredient_name?: string;
   cashier_name?: string;
-  branch_name?: string;
   amount?: number;
 }
 
@@ -173,10 +155,4 @@ export interface DashboardStats {
   paymentBreakdown: { method: PaymentMethod; amount: number; count: number }[];
   dailyRevenue: { date: string; amount: number }[];
   topProducts: { name: string; qty: number; revenue: number }[];
-  branchBreakdown: {
-    branch_id: string;
-    branch_name: string;
-    revenue: number;
-    orders: number;
-  }[];
 }

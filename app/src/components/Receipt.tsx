@@ -1,13 +1,12 @@
-import { useEffect, useRef } from 'react';
-import { Printer } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import type { CartItem, ReceiptConfig } from '@/types';
+import { useEffect, useRef } from "react";
+import { Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { CartItem, ReceiptConfig } from "@/types";
 
 interface ReceiptProps {
   orderNumber: string;
   date: string;
   cashierName: string;
-  branchName: string;
   items: CartItem[];
   paymentMethod: string;
   receiptConfig: ReceiptConfig;
@@ -18,7 +17,6 @@ export function Receipt({
   orderNumber,
   date,
   cashierName,
-  branchName,
   items,
   paymentMethod,
   receiptConfig,
@@ -35,8 +33,8 @@ export function Receipt({
 
   useEffect(() => {
     if (contentRef.current) {
-      contentRef.current.innerHTML = '';
-      const fullText = contentRef.current.dataset.text || '';
+      contentRef.current.innerHTML = "";
+      const fullText = contentRef.current.dataset.text || "";
       let idx = -1;
       let speed = 100;
       const easing = 0.1;
@@ -64,17 +62,16 @@ export function Receipt({
   const receiptText = `${receiptConfig.header_text}
 ${receiptConfig.address}
 Contact: ${receiptConfig.contact_number}
-${receiptConfig.show_branch_name ? branchName : ''}
-${'-'.repeat(32)}
+${"-".repeat(32)}
 Order #: ${orderNumber}
 Date: ${date}
-${receiptConfig.show_cashier_name ? `Cashier: ${cashierName}` : ''}
+${receiptConfig.show_cashier_name ? `Cashier: ${cashierName}` : ""}
 Payment: ${paymentMethod.toUpperCase()}
-${'-'.repeat(32)}
-${items.map((item) => `${item.product_name}${item.variant_name ? ` (${item.variant_name})` : ''}`.padEnd(20) + `${item.qty}x`.padStart(4) + `P${(item.price * item.qty).toFixed(2)}`.padStart(8)).join('\n')}
-${'-'.repeat(32)}
-${'TOTAL:'.padEnd(24)}P${total.toFixed(2).padStart(8)}
-${'='.repeat(32)}
+${"-".repeat(32)}
+${items.map((item) => `${item.product_name}${item.variant_name ? ` (${item.variant_name})` : ""}`.padEnd(20) + `${item.qty}x`.padStart(4) + `P${(item.price * item.qty).toFixed(2)}`.padStart(8)).join("\n")}
+${"-".repeat(32)}
+${"TOTAL:".padEnd(24)}P${total.toFixed(2).padStart(8)}
+${"=".repeat(32)}
 ${receiptConfig.footer_message}`;
 
   return (
@@ -88,16 +85,20 @@ ${receiptConfig.footer_message}`;
           ref={contentRef}
           data-text={receiptText}
           className="whitespace-pre-wrap"
-          style={{ display: 'none' }}
+          style={{ display: "none" }}
         />
         {/* Visible receipt content */}
         <div className="receipt-content whitespace-pre-wrap">
-          <h1 className="text-center text-sm font-bold uppercase mb-3" style={{ fontFamily: "'Fredoka', sans-serif" }}>
+          <h1
+            className="text-center text-sm font-bold uppercase mb-3"
+            style={{ fontFamily: "'Fredoka', sans-serif" }}
+          >
             {receiptConfig.header_text}
           </h1>
           <p className="text-center text-xs">{receiptConfig.address}</p>
-          <p className="text-center text-xs">Contact: {receiptConfig.contact_number}</p>
-          {receiptConfig.show_branch_name && <p className="text-center text-xs font-medium mt-1">{branchName}</p>}
+          <p className="text-center text-xs">
+            Contact: {receiptConfig.contact_number}
+          </p>
           <div className="receipt-line" />
           <p>Order #: {orderNumber}</p>
           <p>Date: {date}</p>
@@ -109,10 +110,17 @@ ${receiptConfig.footer_message}`;
               <div key={i} className="flex justify-between text-xs mb-1">
                 <span className="flex-1">
                   {item.product_name}
-                  {item.variant_name && <span className="text-muted-foreground"> ({item.variant_name})</span>}
+                  {item.variant_name && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({item.variant_name})
+                    </span>
+                  )}
                 </span>
                 <span className="w-8 text-center">{item.qty}x</span>
-                <span className="w-16 text-right">P{(item.price * item.qty).toFixed(2)}</span>
+                <span className="w-16 text-right">
+                  P{(item.price * item.qty).toFixed(2)}
+                </span>
               </div>
             ))}
           </div>
