@@ -95,7 +95,6 @@ export function AdminPage() {
     { id: "products", icon: Package, label: "Products" },
     { id: "categories", icon: LayoutGrid, label: "Categories" },
     { id: "ingredients", icon: ChefHat, label: "Ingredients" },
-    { id: "branches", icon: Store, label: "Branches" },
     ...(currentUser?.role === "tenant" || currentUser?.role === "super_admin"
       ? [{ id: "cashiers", icon: Users, label: "Cashiers" } as const]
       : []),
@@ -181,9 +180,6 @@ export function AdminPage() {
         )}
         {activeTab === "ingredients" && (
           <AdminIngredients tenantId={currentUser?.tenant_id || ""} />
-        )}
-        {activeTab === "branches" && (
-          <AdminBranches tenantId={currentUser?.tenant_id || ""} />
         )}
         {activeTab === "cashiers" &&
           (currentUser?.role === "tenant" ||
@@ -1322,130 +1318,6 @@ function AdminIngredients({ tenantId }: { tenantId: string }) {
             })}
           </tbody>
         </table>
-      </div>
-    </div>
-  );
-}
-
-// ─── Admin Branches ───
-function AdminBranches({ tenantId }: { tenantId: string }) {
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [isAdding, setIsAdding] = useState(false);
-  const [newBranch, setNewBranch] = useState({ name: "", address: "" });
-
-  const load = useCallback(async () => {
-    setBranches(await getBranches(tenantId));
-  }, [tenantId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleAdd = async () => {
-    if (!newBranch.name.trim()) return;
-    await createBranch({
-      tenant_id: tenantId,
-      name: newBranch.name.trim(),
-      address: newBranch.address,
-      manager_id: null,
-      is_active: true,
-    });
-    setNewBranch({ name: "", address: "" });
-    setIsAdding(false);
-    load();
-  };
-
-  const toggleActive = async (branch: Branch) => {
-    await updateBranch(branch.id, { is_active: !branch.is_active });
-    load();
-  };
-
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#2c2c2c] font-heading">
-            Branches
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {branches.filter((b) => b.is_active).length} active of{" "}
-            {branches.length} total
-          </p>
-        </div>
-        <Button
-          onClick={() => setIsAdding(true)}
-          className="bg-accent-orange hover:bg-accent-hover text-white rounded-full shadow-float"
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Add Branch
-        </Button>
-      </div>
-
-      {isAdding && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm mb-4 space-y-3">
-          <Input
-            placeholder="Branch name"
-            value={newBranch.name}
-            onChange={(e) =>
-              setNewBranch({ ...newBranch, name: e.target.value })
-            }
-            className="rounded-xl"
-          />
-          <Input
-            placeholder="Address"
-            value={newBranch.address}
-            onChange={(e) =>
-              setNewBranch({ ...newBranch, address: e.target.value })
-            }
-            className="rounded-xl"
-          />
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsAdding(false)}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAdd}
-              className="bg-accent-orange text-white rounded-full shadow-float"
-            >
-              Create Branch
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {branches.map((branch) => (
-          <div key={branch.id} className="bg-white rounded-2xl p-5 shadow-sm">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="font-heading font-semibold text-lg">
-                  {branch.name}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {branch.address}
-                </p>
-              </div>
-              <button onClick={() => toggleActive(branch)} className="shrink-0">
-                {branch.is_active ? (
-                  <ToggleRight className="w-8 h-8 text-success-green" />
-                ) : (
-                  <ToggleLeft className="w-8 h-8 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${branch.is_active ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-500"}`}
-              >
-                {branch.is_active ? "Active" : "Inactive"}
-              </span>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
