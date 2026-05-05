@@ -12,7 +12,10 @@ function AdminButton() {
   const { currentUser } = useAuth();
 
   // Only show for admin/owner users
-  if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "owner")) {
+  if (
+    !currentUser ||
+    (currentUser.role !== "admin" && currentUser.role !== "owner")
+  ) {
     return null;
   }
 
@@ -50,59 +53,62 @@ function App() {
     <>
       <AdminButton />
       <Routes>
-      <Route
-        path="/login"
-        element={
-          isAuthenticated ? (
-            <Navigate to={getRedirectPath(currentUser?.role)} replace />
-          ) : (
-            <LoginPage />
-          )
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute
-            allowedRoles={["admin", "owner"]}
-            userRole={currentUser?.role}
-          >
-            <AdminPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute
-            allowedRoles={["owner", "admin"]}
-            userRole={currentUser?.role}
-          >
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/cashier"
-        element={
-          <ProtectedRoute
-            allowedRoles={["cashier", "admin", "owner"]}
-            userRole={currentUser?.role}
-          >
-            <CashierPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/"
-        element={
-          <Navigate
-            to={isAuthenticated ? getRedirectPath(currentUser?.role) : "/login"}
-            replace
-          />
-        }
-      />
-    </Routes>
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? (
+              <Navigate to={getRedirectPath(currentUser?.role)} replace />
+            ) : (
+              <LoginPage />
+            )
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute
+              allowedRoles={["admin", "owner"]}
+              userRole={currentUser?.role}
+            >
+              <AdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute
+              allowedRoles={["owner", "admin"]}
+              userRole={currentUser?.role}
+            >
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cashier"
+          element={
+            <ProtectedRoute
+              allowedRoles={["cashier", "admin", "owner"]}
+              userRole={currentUser?.role}
+            >
+              <CashierPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to={
+                isAuthenticated ? getRedirectPath(currentUser?.role) : "/login"
+              }
+              replace
+            />
+          }
+        />
+      </Routes>
+    </>
   );
 }
 
