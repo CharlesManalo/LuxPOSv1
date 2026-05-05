@@ -17,18 +17,22 @@ export function LoginPage() {
 
   const [email, setEmail] = useState(() => {
     if (roleParam === "owner") return "juan@silogan.ph";
+    if (roleParam === "admin") return "admin@luxpos.app";
     return "maria@silogan.ph";
   });
   const [password, setPassword] = useState("password");
   const [showPassword, setShowPassword] = useState(false);
   const [activeRole, setActiveRole] = useState<UserRole>(() => {
     if (roleParam === "owner") return "owner";
+    if (roleParam === "admin") return "admin";
     return "cashier";
   });
 
   const handleRoleChange = (role: UserRole) => {
     setActiveRole(role);
-    if (role === "owner" || role === "tenant") setEmail("juan@silogan.ph");
+    if (role === "admin" || role === "super_admin")
+      setEmail("admin@luxpos.app");
+    else if (role === "owner" || role === "tenant") setEmail("juan@silogan.ph");
     else setEmail("maria@silogan.ph");
   };
 
@@ -40,7 +44,9 @@ export function LoginPage() {
       const stored = localStorage.getItem("luxpos_user");
       if (stored) {
         const user = JSON.parse(stored);
-        if (user.role === "owner" || user.role === "admin") {
+        if (user.role === "admin") {
+          navigate("/admin");
+        } else if (user.role === "owner") {
           const tenant = await getTenant(user.tenant_id);
           if (tenant) setCurrentTenant(tenant);
           navigate("/dashboard");
@@ -112,7 +118,7 @@ export function LoginPage() {
 
         {/* Role Selector */}
         <div className="flex gap-2 mb-6 p-1 bg-white rounded-full shadow-sm">
-          {(["cashier", "owner"] as const).map((role) => {
+          {(["cashier", "owner", "admin"] as const).map((role) => {
             const RoleIcon = roleConfig[role].icon;
             return (
               <button

@@ -101,6 +101,7 @@ function ProtectedRoute({
 function getRedirectPath(role?: string): string {
   switch (role) {
     case "admin":
+      return "/admin";
     case "owner":
       return "/dashboard";
     case "cashier":
