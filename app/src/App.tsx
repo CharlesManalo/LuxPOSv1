@@ -1,9 +1,31 @@
 import { Routes, Route, Navigate } from "react-router";
+import { useNavigate } from "react-router";
+import { Shield } from "lucide-react";
 import { LoginPage } from "@/pages/LoginPage";
 import { AdminPage } from "@/pages/AdminPage";
 import { CashierPage } from "@/pages/CashierPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { useAuth } from "@/hooks/useAuth";
+
+function AdminButton() {
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
+
+  // Only show for admin/owner users
+  if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "owner")) {
+    return null;
+  }
+
+  return (
+    <button
+      onClick={() => navigate("/admin")}
+      className="fixed top-4 left-4 z-50 w-12 h-12 rounded-full bg-[#2c2c2c] flex items-center justify-center hover:bg-[#1a1a1a] transition-all shadow-lg hover:shadow-xl"
+      title="Admin Panel"
+    >
+      <Shield className="w-6 h-6 text-white" />
+    </button>
+  );
+}
 
 function App() {
   const { isAuthenticated, currentUser, isLoading } = useAuth();
@@ -25,7 +47,9 @@ function App() {
   }
 
   return (
-    <Routes>
+    <>
+      <AdminButton />
+      <Routes>
       <Route
         path="/login"
         element={

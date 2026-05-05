@@ -14,7 +14,6 @@ import {
   Utensils,
   ClipboardList,
   RefreshCw,
-  Shield,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -141,13 +140,6 @@ export function DashboardPage() {
             <div className="w-9 h-9 rounded-xl bg-accent-orange flex items-center justify-center">
               <Store className="w-5 h-5 text-white" />
             </div>
-            <button
-              onClick={() => navigate("/admin")}
-              className="w-9 h-9 rounded-xl bg-[#2c2c2c] flex items-center justify-center hover:bg-[#1a1a1a] transition-colors"
-              title="Admin Panel"
-            >
-              <Shield className="w-5 h-5 text-white" />
-            </button>
             <div>
               <h1 className="font-heading font-bold text-lg text-[#2c2c2c]">
                 {currentTenant?.name || "Dashboard"}
