@@ -86,8 +86,12 @@ export async function getUserByAuthId(authId: string): Promise<AppUser | null> {
     .eq("is_active", true)
     .single();
 
-  if (error && error.code !== "PGRST116") handleSupabaseError(error);
-  return data as AppUser | null;
+  if (error && error.code !== "PGRST116") {
+    console.error("getUserByAuthId error:", error);
+    return null;
+  }
+  if (!data) return null;
+  return data as AppUser;
 }
 
 export async function createUser(
