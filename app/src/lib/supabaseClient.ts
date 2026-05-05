@@ -12,9 +12,19 @@ export function getSupabaseClient() {
 
   // Use fallback values for build environment
   const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    "https://cnycpwqkxytzinejlhkk.supabase.co";
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    process.env.VITE_SUPABASE_URL || "https://cnycpwqkxytzinejlhkk.supabase.co";
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseAnonKey) {
+    console.error("VITE_SUPABASE_ANON_KEY is not configured");
+    console.error(
+      "Available env vars:",
+      Object.keys(process.env).filter((k) => k.includes("SUPABASE")),
+    );
+    throw new Error(
+      "Supabase anonymous key is required. Please check environment variables.",
+    );
+  }
 
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
 
