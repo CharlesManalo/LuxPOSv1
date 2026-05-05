@@ -1,4 +1,5 @@
-import { supabase } from "./supabase";
+import { supabase as rawSupabase } from "./supabase";
+const supabase = rawSupabase as any;
 import type {
   Tenant,
   AppUser,
@@ -10,15 +11,17 @@ import type {
   OrderItem,
   UserRole,
   ProductRecipe,
+  Notification, // Added missing import
 } from "@/types";
 
 // Helper function to handle Supabase errors
-function handleSupabaseError(error: any) {
+function handleSupabaseError(error: any): never {
   console.error("Supabase error:", error);
   throw new Error(error.message || "Database operation failed");
 }
 
-// TENANT OPERATIONS
+// --- TENANT OPERATIONS ---
+
 export async function getTenants(): Promise<any[]> {
   const { data, error } = await supabase
     .from("tenants")
@@ -37,7 +40,7 @@ export async function getTenant(tenantId: string): Promise<Tenant | null> {
     .single();
 
   if (error && error.code !== "PGRST116") handleSupabaseError(error);
-  return data || null;
+  return data as Tenant | null;
 }
 
 export async function createTenant(tenantData: {
@@ -57,7 +60,8 @@ export async function createTenant(tenantData: {
   return data as Tenant;
 }
 
-// USER OPERATIONS
+// --- USER OPERATIONS ---
+
 export async function getUsers(
   tenantId: string,
   role?: UserRole,
@@ -71,7 +75,7 @@ export async function getUsers(
   const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) handleSupabaseError(error);
-  return data || [];
+  return (data || []) as AppUser[];
 }
 
 export async function getUserByAuthId(authId: string): Promise<AppUser | null> {
@@ -83,13 +87,12 @@ export async function getUserByAuthId(authId: string): Promise<AppUser | null> {
     .single();
 
   if (error && error.code !== "PGRST116") handleSupabaseError(error);
-  return data || null;
+  return data as AppUser | null;
 }
 
 export async function createUser(
   user: Omit<AppUser, "id" | "created_at">,
-): Promise<AppUser | null> {
-  // @ts-ignore
+): Promise<AppUser> {
   const { data, error } = await supabase
     .from("users")
     .insert(user as any)
@@ -97,14 +100,14 @@ export async function createUser(
     .single();
 
   if (error) handleSupabaseError(error);
-  return data as AppUser | null;
+  if (!data) throw new Error("Failed to create user");
+  return data as AppUser;
 }
 
 export async function updateUser(
   userId: string,
   updates: Partial<Omit<AppUser, "id" | "created_at">>,
 ): Promise<AppUser> {
-  // @ts-ignore
   const { data, error } = await supabase
     .from("users")
     .update(updates as any)
@@ -119,11 +122,11 @@ export async function updateUser(
 
 export async function deleteUser(userId: string): Promise<void> {
   const { error } = await supabase.from("users").delete().eq("id", userId);
-
   if (error) handleSupabaseError(error);
 }
 
-// CATEGORY OPERATIONS
+// --- CATEGORY OPERATIONS ---
+
 export async function getCategories(tenantId: string): Promise<Category[]> {
   const { data, error } = await supabase
     .from("categories")
@@ -132,7 +135,7 @@ export async function getCategories(tenantId: string): Promise<Category[]> {
     .order("sort_order", { ascending: true });
 
   if (error) handleSupabaseError(error);
-  return (data || []).map((category) => category as Category);
+  return (data || []) as Category[];
 }
 
 export async function createCategory(
@@ -149,7 +152,8 @@ export async function createCategory(
   return data as Category;
 }
 
-// INGREDIENT OPERATIONS
+// --- INGREDIENT OPERATIONS ---
+
 export async function getIngredients(tenantId: string): Promise<Ingredient[]> {
   const { data, error } = await supabase
     .from("ingredients")
@@ -158,7 +162,7 @@ export async function getIngredients(tenantId: string): Promise<Ingredient[]> {
     .order("created_at", { ascending: false });
 
   if (error) handleSupabaseError(error);
-  return data || [];
+  return (data || []) as Ingredient[];
 }
 
 export async function createIngredient(
@@ -171,7 +175,8 @@ export async function createIngredient(
     .single();
 
   if (error) handleSupabaseError(error);
-  return data as unknown as Ingredient;
+  if (!data) throw new Error("Failed to create ingredient");
+  return data as Ingredient;
 }
 
 export async function deleteIngredient(ingredientId: string): Promise<void> {
@@ -188,8 +193,6 @@ export async function restockIngredient(
   qty: number,
   userId: string,
 ): Promise<void> {
-  // Get current ingredient
-  // @ts-ignore
   const { data: ingredient, error: fetchError } = await supabase
     .from("ingredients")
     .select("*")
@@ -199,9 +202,8 @@ export async function restockIngredient(
   if (fetchError) handleSupabaseError(fetchError);
   if (!ingredient) throw new Error("Ingredient not found");
 
-  // Update stock
-  const newStock = ingredient.stock_qty + qty;
-  // @ts-ignore
+  const newStock = (ingredient as any).stock_qty + qty;
+
   const { error: updateError } = await supabase
     .from("ingredients")
     .update({ stock_qty: newStock } as any)
@@ -209,12 +211,10 @@ export async function restockIngredient(
 
   if (updateError) handleSupabaseError(updateError);
 
-  // Create inventory log
-  // @ts-ignore
   const { error: logError } = await supabase.from("inventory_logs").insert({
-    tenant_id: ingredient.tenant_id,
+    tenant_id: (ingredient as any).tenant_id,
     ingredient_id: ingredientId,
-    ingredient_name: ingredient.name,
+    ingredient_name: (ingredient as any).name,
     change_qty: qty,
     reason: qty > 0 ? "restock" : "order",
     triggered_by: userId,
@@ -223,7 +223,8 @@ export async function restockIngredient(
   if (logError) handleSupabaseError(logError);
 }
 
-// PRODUCT OPERATIONS
+// --- PRODUCT OPERATIONS ---
+
 export async function getProducts(tenantId: string): Promise<Product[]> {
   const { data, error } = await supabase
     .from("products")
@@ -239,7 +240,6 @@ export async function getProducts(tenantId: string): Promise<Product[]> {
 
   if (error) handleSupabaseError(error);
 
-  // Transform data to match expected format
   return (data || []).map((product: any) => ({
     ...product,
     variants: product.product_variants || [],
@@ -248,17 +248,14 @@ export async function getProducts(tenantId: string): Promise<Product[]> {
       qty_required: pi.qty_required,
       ingredient: pi.ingredients,
     })),
-  }));
+  })) as Product[];
 }
 
 export async function createProduct(
   product: Omit<Product, "id" | "created_at">,
 ): Promise<Product> {
-  // Extract recipe and variants from the product data
   const { recipe, variants, ...productData } = product as any;
 
-  // Create the product
-  // @ts-ignore
   const { data, error } = await supabase
     .from("products")
     .insert(productData as any)
@@ -268,35 +265,27 @@ export async function createProduct(
   if (error) handleSupabaseError(error);
   if (!data) throw new Error("Failed to create product");
 
-  // Create product ingredients if recipe exists
   if (recipe && recipe.length > 0) {
     const productIngredients = recipe.map((item: ProductRecipe) => ({
       product_id: data.id,
       ingredient_id: item.ingredient_id,
       qty_required: item.qty_required,
     }));
-
-    // @ts-ignore
-    const { error: ingredientError } = await supabase
+    const { error: iErr } = await supabase
       .from("product_ingredients")
       .insert(productIngredients as any);
-
-    if (ingredientError) handleSupabaseError(ingredientError);
+    if (iErr) handleSupabaseError(iErr);
   }
 
-  // Create product variants if they exist
   if (variants && variants.length > 0) {
     const productVariants = variants.map((variant: any) => ({
       ...variant,
       product_id: data.id,
     }));
-
-    // @ts-ignore
-    const { error: variantError } = await supabase
+    const { error: vErr } = await supabase
       .from("product_variants")
       .insert(productVariants as any);
-
-    if (variantError) handleSupabaseError(variantError);
+    if (vErr) handleSupabaseError(vErr);
   }
 
   return data as Product;
@@ -309,10 +298,8 @@ export async function updateProduct(
     variants?: ProductVariant[];
   },
 ): Promise<Product> {
-  // Extract recipe and variants from updates
   const { recipe, variants, ...productData } = updates;
 
-  // Update the product
   const { data, error } = await supabase
     .from("products")
     .update(productData as any)
@@ -323,31 +310,25 @@ export async function updateProduct(
   if (error) handleSupabaseError(error);
   if (!data) throw new Error("Product not found");
 
-  // Update product ingredients if recipe is provided
   if (recipe !== undefined) {
-    // Delete existing ingredients
     await supabase
       .from("product_ingredients")
       .delete()
       .eq("product_id", productId);
-
-    // Add new ingredients
     if (recipe.length > 0) {
       const productIngredients = recipe.map((item: ProductRecipe) => ({
         product_id: productId,
         ingredient_id: item.ingredient_id,
         qty_required: item.qty_required,
       }));
-
-      const { error: ingredientError } = await supabase
+      const { error: iErr } = await supabase
         .from("product_ingredients")
-        .insert(productIngredients);
-
-      if (ingredientError) handleSupabaseError(ingredientError);
+        .insert(productIngredients as any);
+      if (iErr) handleSupabaseError(iErr);
     }
   }
 
-  return data;
+  return data as Product;
 }
 
 export async function deleteProduct(productId: string): Promise<void> {
@@ -355,7 +336,6 @@ export async function deleteProduct(productId: string): Promise<void> {
     .from("products")
     .delete()
     .eq("id", productId);
-
   if (error) handleSupabaseError(error);
 }
 
@@ -369,10 +349,11 @@ export async function getProductVariants(
     .order("created_at", { ascending: true });
 
   if (error) handleSupabaseError(error);
-  return data || [];
+  return (data || []) as ProductVariant[];
 }
 
-// ORDER OPERATIONS
+// --- ORDER OPERATIONS ---
+
 export async function getOrders(
   tenantId: string,
   limit?: number,
@@ -383,12 +364,9 @@ export async function getOrders(
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false });
 
-  if (limit) {
-    query = query.limit(limit);
-  }
+  if (limit) query = query.limit(limit);
 
   const { data, error } = await query;
-
   if (error) handleSupabaseError(error);
   return (data || []) as Order[];
 }
@@ -401,9 +379,11 @@ export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
     .order("created_at", { ascending: true });
 
   if (error) handleSupabaseError(error);
-  return data || [];
+  return (data || []) as OrderItem[];
 }
-// NOTIFICATIONS
+
+// --- NOTIFICATIONS ---
+
 export async function getNotifications(
   tenantId: string,
 ): Promise<Notification[]> {
@@ -414,29 +394,28 @@ export async function getNotifications(
     .order("created_at", { ascending: false });
 
   if (error) handleSupabaseError(error);
-  return data || [];
+  return (data || []) as Notification[];
 }
 
 export async function updateNotificationStatus(
   notificationId: string,
   status: "approved" | "rejected",
 ): Promise<void> {
-  // @ts-ignore
   const { error } = await supabase
     .from("notifications")
-    .update({ status })
+    .update({ status } as any)
     .eq("id", notificationId);
 
   if (error) handleSupabaseError(error);
 }
 
-// AUTH OPERATIONS (placeholder - would integrate with Supabase Auth)
+// --- AUTH & PROFILE ---
+
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
-
   if (error) handleSupabaseError(error);
   return { user: data.user, error };
 }
@@ -446,14 +425,13 @@ export async function signOut() {
 }
 
 export async function getUserProfile(userId: string): Promise<any> {
-  // @ts-ignore
   const { data, error } = await supabase
     .from("user_profiles")
     .select("*")
     .eq("user_id", userId)
     .single();
 
-  if (error) handleSupabaseError(error);
+  if (error && error.code !== "PGRST116") handleSupabaseError(error);
   return data || {};
 }
 
@@ -461,7 +439,6 @@ export async function updateUserProfile(
   userId: string,
   updates: Partial<any>,
 ): Promise<any> {
-  // @ts-ignore
   const { data, error } = await supabase
     .from("user_profiles")
     .update(updates)

@@ -21,23 +21,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStore } from "@/stores/useStore";
 import {
   getTenant,
-  getDashboardStats,
-  getNotifications,
-  updateNotificationStatus,
-  getIngredients,
   getProducts,
   getCategories,
-  createIngredient,
-  deleteIngredient,
-  createProduct,
-  deleteProduct,
-  restockIngredient,
-  getOrders,
-  getOrderItems,
-  getUsers,
-  createUser,
-  updateUser,
-  deleteUser,
+  getProductVariants,
+  getIngredients,
 } from "@/lib/mockDb";
 import { createOrderWithInventory } from "@/lib/atomicOrders";
 import type { Product, Category, ProductVariant, PaymentMethod } from "@/types";
@@ -235,7 +222,7 @@ export function CashierPage() {
         },
         orderItems,
         products,
-        currentUser.id,
+        ingredients,
       );
 
       // Refresh data to reflect new stock levels

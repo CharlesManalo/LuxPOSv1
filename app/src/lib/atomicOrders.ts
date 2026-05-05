@@ -1,4 +1,5 @@
-import { supabase } from "./supabase";
+import { supabase as rawSupabase } from "./supabase";
+const supabase = rawSupabase as any;
 import type { Order, OrderItem, Product, Ingredient } from "@/types";
 
 // Helper function to handle Supabase errors
@@ -109,7 +110,7 @@ export async function createOrderAtomic(
     for (const req of product.recipe) {
       const required = req.qty_required * (item as any).qty;
       const ing = fetchedIngredients.find(
-        (i) => (i as any).id === req.ingredient_id,
+        (i: Ingredient) => (i as any).id === req.ingredient_id,
       );
 
       if (!stockDeductions[req.ingredient_id]) {
@@ -268,6 +269,9 @@ export async function restoreIngredientStockOnVoid(
  *
  * Restores stock when an order is voided
  */
+// Alias for createOrderAtomic to fix missing export
+export const createOrderWithInventory = createOrderAtomic;
+
 export async function voidOrderWithInventory(
   orderId: string,
   userId: string,
