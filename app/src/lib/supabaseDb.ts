@@ -1,5 +1,5 @@
-import { supabase as rawSupabase } from "./supabase";
-const supabase = rawSupabase as any;
+import { getSupabaseClient } from "./supabaseClient";
+const supabase = getSupabaseClient();
 import type {
   Tenant,
   AppUser,

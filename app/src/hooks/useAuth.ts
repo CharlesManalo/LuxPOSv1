@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useStore } from "@/stores/useStore";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabaseClient";
 import { getUserByAuthId } from "@/lib/supabaseDb";
 
 export function useAuth() {
@@ -8,10 +8,15 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener
+    const supabase = getSupabaseClient();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return; // Prevent memory leaks
+
       if (event === "SIGNED_IN" && session?.user) {
         setLoading(true);
         try {
@@ -24,6 +29,7 @@ export function useAuth() {
             await supabase.auth.signOut();
           }
         } catch (err) {
+          console.error("Auth initialization error:", err);
           setError("Failed to load user profile");
           await supabase.auth.signOut();
         } finally {
@@ -37,6 +43,7 @@ export function useAuth() {
 
     // Check for existing session
     const initializeAuth = async () => {
+      if (!mounted) return; // Prevent memory leaks
       setLoading(true);
       try {
         const {
@@ -57,7 +64,10 @@ export function useAuth() {
 
     initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false; // Cleanup
+      subscription.unsubscribe();
+    };
   }, [setUser, setLoading]);
 
   const login = useCallback(
