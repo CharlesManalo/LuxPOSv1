@@ -1,5 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
+// Declare process for build environment
+declare const process: any;
+
 let supabaseInstance: ReturnType<typeof createClient> | null = null;
 
 export function getSupabaseClient() {

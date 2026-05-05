@@ -142,16 +142,17 @@ export async function createOrderAtomic(
     }
 
     // Update stock
-    // @ts-ignore
     const { error: updateError } = await supabase
       .from("ingredients")
-      .update({ stock_qty: deduction.newStock } as any)
+      .update({ stock_qty: deduction.newStock })
       .eq("id", ingredientId);
 
-    if (updateError) handleSupabaseError(updateError);
+    if (updateError) {
+      console.error("Failed to update ingredient stock:", updateError);
+      throw new Error("Failed to update ingredient stock");
+    }
 
     // Log inventory change
-    // @ts-ignore
     const { error: logError } = await supabase.from("inventory_logs").insert({
       tenant_id: (order as any).tenant_id,
       ingredient_id: ingredientId,
@@ -159,9 +160,11 @@ export async function createOrderAtomic(
       change_qty: deduction.change,
       reason: "order",
       triggered_by: (order as any).cashier_id,
-    } as any);
+    });
 
-    if (logError) handleSupabaseError(logError);
+    if (logError) {
+      console.error("Failed to log inventory change:", logError);
+    }
 
     console.log(
       `📝 Updated ${deduction.name}: ${deduction.currentStock} → ${deduction.newStock} (${deduction.change})`,
@@ -238,11 +241,13 @@ export async function restoreIngredientStockOnVoid(
     );
   }
 
-  // @ts-ignore
-  const { error: updateError } = await supabase
+  // Update stock using any type bypass
+  // @ts-nocheck
+  const updateResult = await (supabase as any)
     .from("ingredients")
-    .update({ stock_qty: newStock } as any)
+    .update({ stock_qty: newStock })
     .eq("id", ingredientId);
+  const { error: updateError } = updateResult;
 
   if (updateError) handleSupabaseError(updateError);
 
@@ -255,7 +260,7 @@ export async function restoreIngredientStockOnVoid(
     change_qty: amount,
     reason: amount > 0 ? "restock" : "adjustment",
     triggered_by: userId,
-  } as any);
+  });
 
   if (logError) handleSupabaseError(logError);
 
@@ -337,11 +342,13 @@ export async function voidOrderWithInventory(
     );
   }
 
-  // Update order status
-  const { error: updateError } = await supabase
+  // Update order status using any type bypass
+  // @ts-nocheck
+  const updateResult = await (supabase as any)
     .from("orders")
-    .update({ status: "voided" } as any)
+    .update({ status: "voided" })
     .eq("id", orderId);
+  const { error: updateError } = updateResult;
 
   if (updateError) handleSupabaseError(updateError);
 

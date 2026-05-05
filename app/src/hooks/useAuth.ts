@@ -75,6 +75,7 @@ export function useAuth() {
       setError(null);
       setLoading(true);
       try {
+        const supabase = getSupabaseClient();
         const { data, error: authError } =
           await supabase.auth.signInWithPassword({
             email,
@@ -106,6 +107,7 @@ export function useAuth() {
   const logout = useCallback(async () => {
     setError(null);
     try {
+      const supabase = getSupabaseClient();
       await supabase.auth.signOut();
       // The auth state change listener will handle clearing the user
     } catch (err) {
