@@ -1,3 +1,11 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export interface Database {
   public: {
     Tables: {
@@ -7,28 +15,32 @@ export interface Database {
           name: string;
           slug: string;
           receipt_printing_enabled: boolean;
-          receipt_config: Record<string, unknown>;
+          receipt_config: Json;
           created_at: string;
+          updated_at: string;
         };
         Insert: Omit<
           Database["public"]["Tables"]["tenants"]["Row"],
-          "id" | "created_at"
+          "id" | "created_at" | "updated_at"
         >;
         Update: Partial<Database["public"]["Tables"]["tenants"]["Insert"]>;
       };
       users: {
         Row: {
           id: string;
+          auth_id: string;
           tenant_id: string;
-          role: "super_admin" | "tenant" | "cashier";
+          role: "super_admin" | "tenant" | "cashier" | "admin" | "owner";
           full_name: string;
           email: string;
           avatar_url: string | null;
+          is_active: boolean;
           created_at: string;
+          updated_at: string;
         };
         Insert: Omit<
           Database["public"]["Tables"]["users"]["Row"],
-          "id" | "created_at"
+          "id" | "created_at" | "updated_at"
         >;
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
       };
@@ -39,10 +51,11 @@ export interface Database {
           name: string;
           sort_order: number;
           created_at: string;
+          updated_at: string;
         };
         Insert: Omit<
           Database["public"]["Tables"]["categories"]["Row"],
-          "id" | "created_at"
+          "id" | "created_at" | "updated_at"
         >;
         Update: Partial<Database["public"]["Tables"]["categories"]["Insert"]>;
       };
@@ -55,10 +68,11 @@ export interface Database {
           stock_qty: number;
           low_stock_threshold: number;
           created_at: string;
+          updated_at: string;
         };
         Insert: Omit<
           Database["public"]["Tables"]["ingredients"]["Row"],
-          "id" | "created_at"
+          "id" | "created_at" | "updated_at"
         >;
         Update: Partial<Database["public"]["Tables"]["ingredients"]["Insert"]>;
       };
@@ -66,20 +80,21 @@ export interface Database {
         Row: {
           id: string;
           tenant_id: string;
-          category_id: string;
+          category_id: string | null;
           name: string;
           price: number;
-          image_url: string;
+          image_url: string | null;
           is_available: boolean;
           description: string;
           has_variants: boolean;
           created_at: string;
+          updated_at: string;
         };
         Insert: Omit<
           Database["public"]["Tables"]["products"]["Row"],
-          "id" | "created_at"
+          "id" | "created_at" | "updated_at"
         >;
-        Update: Partial<Database["public"]["Tables"]["products"]["Insert"]>;
+        Update: any;
       };
       product_variants: {
         Row: {
@@ -180,7 +195,7 @@ export interface Database {
       };
     };
     Enums: {
-      user_role: "super_admin" | "tenant" | "cashier";
+      user_role: "super_admin" | "tenant" | "cashier" | "admin" | "owner";
       order_status: "completed" | "voided";
       payment_method: "cash" | "gcash" | "maya";
       notification_type:

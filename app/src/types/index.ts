@@ -46,6 +46,11 @@ export interface Ingredient {
   created_at: string;
 }
 
+export interface ProductRecipe {
+  ingredient_id: string;
+  qty_required: number;
+}
+
 export interface Product {
   id: string;
   tenant_id: string;
@@ -56,6 +61,7 @@ export interface Product {
   is_available: boolean;
   description: string;
   has_variants: boolean;
+  recipe?: ProductRecipe[];
   created_at: string;
 }
 
@@ -155,4 +161,14 @@ export interface DashboardStats {
   paymentBreakdown: { method: PaymentMethod; amount: number; count: number }[];
   dailyRevenue: { date: string; amount: number }[];
   topProducts: { name: string; qty: number; revenue: number }[];
+}
+
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  tenant_id: string | null;
+  preferences: Record<string, unknown>;
+  last_login: string | null;
+  created_at: string;
+  updated_at: string;
 }

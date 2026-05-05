@@ -1,57 +1,55 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 import { Coffee, Store, Shield, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useStore } from "@/stores/useStore";
-import { getTenant } from "@/lib/mockDb";
+import { getTenant } from "@/lib/supabaseDb";
 import type { UserRole } from "@/types";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const roleParam = searchParams.get("role");
   const { login, error, isLoading } = useAuth();
   const { setCurrentTenant } = useStore();
 
-  const [email, setEmail] = useState(() => {
-    if (roleParam === "owner") return "juan@silogan.ph";
-    return "maria@silogan.ph";
-  });
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [activeRole, setActiveRole] = useState<UserRole>(() => {
-    if (roleParam === "owner") return "owner";
-    return "cashier";
-  });
+  const [activeRole, setActiveRole] = useState<UserRole>("cashier");
 
   const handleRoleChange = (role: UserRole) => {
     setActiveRole(role);
-    if (role === "owner" || role === "tenant") setEmail("juan@silogan.ph");
-    else setEmail("maria@silogan.ph");
+    setEmail(""); // Clear email when switching roles
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const success = await login(email, password);
     if (success) {
-      // Get user data from store after login
-      const stored = localStorage.getItem("luxpos_user");
-      if (stored) {
-        const user = JSON.parse(stored);
-        if (user.role === "owner" || user.role === "admin") {
-          const tenant = await getTenant(user.tenant_id);
-          if (tenant) setCurrentTenant(tenant);
-          navigate("/dashboard");
-        } else {
-          const tenant = await getTenant(user.tenant_id);
-          if (tenant) {
-            setCurrentTenant(tenant);
+      // Wait for auth state to update and then navigate
+      setTimeout(async () => {
+        const { currentUser } = useStore.getState();
+        if (currentUser) {
+          if (
+            currentUser.role === "admin" ||
+            currentUser.role === "super_admin"
+          ) {
+            navigate("/admin");
+          } else if (
+            currentUser.role === "owner" ||
+            currentUser.role === "tenant"
+          ) {
+            const tenant = await getTenant(currentUser.tenant_id);
+            if (tenant) setCurrentTenant(tenant);
+            navigate("/dashboard");
+          } else {
+            const tenant = await getTenant(currentUser.tenant_id);
+            if (tenant) setCurrentTenant(tenant);
+            navigate("/cashier");
           }
-          navigate("/cashier");
         }
-      }
+      }, 100);
     }
   };
 
@@ -82,7 +80,7 @@ export function LoginPage() {
     },
     super_admin: {
       icon: Shield,
-      label: "Super Admin Access",
+      label: "Super Admin",
       color: "bg-[#2c2c2c]",
       desc: "System administration",
     },
@@ -96,6 +94,19 @@ export function LoginPage() {
       className="min-h-screen flex items-center justify-center p-4"
       style={{ background: "#f5f5f5" }}
     >
+      {/* ── Admin shortcut — fixed top-left ── */}
+      <button
+        onClick={() => handleRoleChange("super_admin")}
+        className={`fixed top-4 left-4 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-150 ${
+          activeRole === "super_admin"
+            ? "bg-[#2c2c2c] text-white border-[#2c2c2c]"
+            : "bg-white text-[#5a5a5a] border-[#e0e0e0] hover:border-[#2c2c2c] hover:text-[#2c2c2c]"
+        }`}
+      >
+        <Shield className="w-4 h-4" />
+        <span>Admin</span>
+      </button>
+
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -110,7 +121,7 @@ export function LoginPage() {
           </p>
         </div>
 
-        {/* Role Selector */}
+        {/* Role Selector — cashier / owner only */}
         <div className="flex gap-2 mb-6 p-1 bg-white rounded-full shadow-sm">
           {(["cashier", "owner"] as const).map((role) => {
             const RoleIcon = roleConfig[role].icon;
@@ -207,39 +218,6 @@ export function LoginPage() {
               )}
             </Button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 pt-4 border-t border-[#e0e0e0]">
-            <p className="text-xs text-muted-foreground text-center mb-2">
-              Demo credentials
-            </p>
-            <div className="grid grid-cols-1 gap-1.5 text-xs text-muted-foreground">
-              <button
-                type="button"
-                onClick={() => handleRoleChange("cashier")}
-                className="text-left px-3 py-1.5 rounded-lg hover:bg-[#f5f5f5] transition-colors"
-              >
-                <span className="font-medium text-[#ff9e2c]">Cashier:</span>{" "}
-                maria@silogan.ph
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleChange("tenant")}
-                className="text-left px-3 py-1.5 rounded-lg hover:bg-[#f5f5f5] transition-colors"
-              >
-                <span className="font-medium text-[#00c29f]">Tenant:</span>{" "}
-                juan@silogan.ph
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleChange("super_admin")}
-                className="text-left px-3 py-1.5 rounded-lg hover:bg-[#f5f5f5] transition-colors"
-              >
-                <span className="font-medium text-[#2c2c2c]">Super Admin:</span>{" "}
-                admin@luxpos.app
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

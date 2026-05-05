@@ -68,7 +68,7 @@ export const useStore = create<AppState>((set, get) => ({
   // Auth
   currentUser: null,
   isAuthenticated: false,
-  isLoading: true,
+  isLoading: false,
   setUser: (user) => set({ currentUser: user, isAuthenticated: !!user }),
   setLoading: (loading) => set({ isLoading: loading }),
 

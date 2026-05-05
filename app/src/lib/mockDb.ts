@@ -752,3 +752,25 @@ export async function createUser(
   setStoredData({ users: data.users });
   return newUser;
 }
+
+export async function updateUser(
+  userId: string,
+  updates: Partial<Omit<AppUser, "id" | "created_at">>,
+): Promise<AppUser> {
+  await delay(300);
+  const data = getStoredData();
+  const userIndex = data.users.findIndex((u) => u.id === userId);
+  if (userIndex === -1) {
+    throw new Error("User not found");
+  }
+  data.users[userIndex] = { ...data.users[userIndex], ...updates };
+  setStoredData({ users: data.users });
+  return data.users[userIndex];
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await delay(300);
+  const data = getStoredData();
+  data.users = data.users.filter((u) => u.id !== userId);
+  setStoredData({ users: data.users });
+}

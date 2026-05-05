@@ -20,13 +20,26 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useStore } from "@/stores/useStore";
 import {
+  getTenant,
+  getDashboardStats,
+  getNotifications,
+  updateNotificationStatus,
+  getIngredients,
   getProducts,
   getCategories,
-  getProductVariants,
-  getTenant,
-  createOrder,
-  getIngredients,
+  createIngredient,
+  deleteIngredient,
+  createProduct,
+  deleteProduct,
+  restockIngredient,
+  getOrders,
+  getOrderItems,
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
 } from "@/lib/mockDb";
+import { createOrderWithInventory } from "@/lib/atomicOrders";
 import type { Product, Category, ProductVariant, PaymentMethod } from "@/types";
 import { Receipt } from "@/components/Receipt";
 import gsap from "gsap";
@@ -48,6 +61,7 @@ export function CashierPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [ingredients, setIngredients] = useState<any[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -62,6 +76,7 @@ export function CashierPage() {
   );
   const [lowStockAlert, setLowStockAlert] = useState<string[]>([]);
   const [showSuccessFlash, setShowSuccessFlash] = useState(false);
+  const [showCartModal, setShowCartModal] = useState(false);
 
   const cartItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const modalRef = useRef<HTMLDivElement>(null);
@@ -82,9 +97,11 @@ export function CashierPage() {
       Promise.all([
         getProducts(currentUser.tenant_id),
         getCategories(currentUser.tenant_id),
-      ]).then(([p, c]) => {
+        getIngredients(currentUser.tenant_id),
+      ]).then(([p, c, i]) => {
         setProducts(p);
         setCategories(c);
+        setIngredients(i);
       });
     }
   }, [currentUser, setCurrentTenant]);
@@ -115,7 +132,37 @@ export function CashierPage() {
     return matchesCategory && matchesSearch;
   });
 
+  // UPGRADE 1: Real-time product availability computation
+  function getProductAvailability(product: Product, ingredients: any[]) {
+    if (!product.recipe || product.recipe.length === 0) return true;
+
+    return product.recipe.every((req) => {
+      const ing = ingredients.find((i) => i.id === req.ingredient_id);
+      return ing && ing.stock_qty >= req.qty_required;
+    });
+  }
+
+  // UPGRADE 2: Pre-cart validation to prevent overselling
+  function canAddToCart(product: Product, ingredients: any[], qty = 1) {
+    if (!product.recipe) return true;
+
+    return product.recipe.every((req) => {
+      const ing = ingredients.find((i) => i.id === req.ingredient_id);
+      return ing && ing.stock_qty >= req.qty_required * qty;
+    });
+  }
+
+  // Real-time availability map
+  const availabilityMap = new Map(
+    products.map((p) => [p.id, getProductAvailability(p, ingredients)]),
+  );
+
   const handleProductClick = async (product: Product) => {
+    // UPGRADE 2: Pre-cart validation to prevent overselling
+    if (!canAddToCart(product, ingredients, 1)) {
+      return; // Optionally show toast later
+    }
+
     if (!product.has_variants) {
       addToCart({
         product_id: product.id,
@@ -164,34 +211,54 @@ export function CashierPage() {
 
   const handleSendOrder = async () => {
     if (!currentUser) return;
-    const total = getCartTotal();
-    const orderItems = cart.map((item) => ({
-      product_id: item.product_id,
-      product_name: item.product_name,
-      variant_name: item.variant_name,
-      qty: item.qty,
-      unit_price: item.price,
-      order_id: "",
-    }));
 
-    const order = await createOrder(
-      {
-        tenant_id: currentUser.tenant_id,
-        cashier_id: currentUser.id,
-        status: "completed",
-        payment_method: paymentMethod,
-        total,
-      },
-      orderItems,
-    );
+    // 🔄 ATOMIC ORDER CREATION WITH INVENTORY DEDUCTION
+    try {
+      const total = getCartTotal();
+      const orderItems = cart.map((item) => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        variant_name: item.variant_name,
+        qty: item.qty,
+        unit_price: item.price,
+        order_id: "", // This will be set by the atomic order function
+      }));
 
-    setOrderNumber(order.id.split("-")[1] || order.id);
-    setShowSuccessFlash(true);
-    setTimeout(() => setShowSuccessFlash(false), 600);
+      // Create order with atomic inventory deduction
+      const order = await createOrderWithInventory(
+        {
+          tenant_id: currentUser.tenant_id,
+          cashier_id: currentUser.id,
+          status: "completed",
+          payment_method: paymentMethod,
+          total,
+        },
+        orderItems,
+        products,
+        currentUser.id,
+      );
 
-    setTimeout(() => {
-      setCheckoutStep("success");
-    }, 300);
+      // Refresh data to reflect new stock levels
+      const [updatedProducts, updatedIngredients] = await Promise.all([
+        getProducts(currentUser.tenant_id),
+        getIngredients(currentUser.tenant_id),
+      ]);
+      setProducts(updatedProducts);
+      setIngredients(updatedIngredients);
+
+      setOrderNumber(order.id.split("-")[1] || order.id);
+      setShowSuccessFlash(true);
+      setTimeout(() => setShowSuccessFlash(false), 600);
+
+      setTimeout(() => {
+        setCheckoutStep("success");
+      }, 300);
+    } catch (error) {
+      console.error("Order submission failed:", error);
+      alert(
+        `Order failed: ${error instanceof Error ? error.message : "Please try again."}`,
+      );
+    }
   };
 
   const handleNewOrder = () => {
@@ -222,7 +289,7 @@ export function CashierPage() {
 
   return (
     <div
-      className="h-screen flex overflow-hidden"
+      className="h-screen flex overflow-hidden max-w-full"
       style={{ background: "#f5f5f5" }}
     >
       {/* Success flash overlay */}
@@ -237,50 +304,62 @@ export function CashierPage() {
       {checkoutStep === "catalog" && (
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar */}
-          <div className="h-16 bg-white border-b border-[#e0e0e0] flex items-center px-4 gap-4 shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-accent-orange flex items-center justify-center shrink-0">
-              <ShoppingCart className="w-5 h-5 text-white" />
+          <div className="h-16 bg-white border-b border-[#e0e0e0] flex items-center px-2 sm:px-4 gap-2 sm:gap-4 shrink-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-accent-orange flex items-center justify-center shrink-0">
+              <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="font-heading font-bold text-lg text-[#2c2c2c] truncate">
+              <h1 className="font-heading font-bold text-sm sm:text-lg text-[#2c2c2c] truncate">
                 {currentTenant?.name || "Cashier"}
               </h1>
-              <p className="text-xs text-muted-foreground truncate">
+              <p className="text-xs text-muted-foreground truncate hidden sm:block">
                 {currentUser.full_name}
               </p>
             </div>
-            {lowStockAlert.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-1.5 flex items-center gap-2 shrink-0">
-                <span className="text-xs text-red-600 font-medium">
-                  Low stock: {lowStockAlert.join(", ")}
+            {/* Cart Toggle Button - Mobile */}
+            <button
+              onClick={() => setShowCartModal(true)}
+              className="lg:hidden relative w-8 h-8 rounded-full bg-accent-orange flex items-center justify-center shrink-0 hover:bg-accent-hover transition-colors"
+            >
+              <ShoppingCart className="w-4 h-4 text-white" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger-red text-white text-xs flex items-center justify-center font-bold">
+                  {cartCount}
                 </span>
-              </div>
-            )}
-            <div className="relative w-48 shrink-0">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              )}
+            </button>
+            <div className="relative w-24 sm:w-48 shrink-0">
+              <Search className="w-3 h-3 sm:w-4 sm:h-4 absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
-                className="pl-9 h-9 rounded-full border-[#e0e0e0] text-sm"
+                className="pl-7 sm:pl-9 h-8 sm:h-9 rounded-full border-[#e0e0e0] text-xs sm:text-sm"
               />
             </div>
+            {lowStockAlert.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-2 py-1 flex items-center gap-1 shrink-0 hidden sm:block">
+                <span className="text-xs text-red-600 font-medium truncate">
+                  Low stock: {lowStockAlert.join(", ")}
+                </span>
+              </div>
+            )}
             <button
               onClick={() => {
                 logout();
                 navigate("/login");
               }}
-              className="text-sm text-muted-foreground hover:text-[#2c2c2c] shrink-0"
+              className="text-xs sm:text-sm text-muted-foreground hover:text-[#2c2c2c] shrink-0 hidden sm:block"
             >
               Logout
             </button>
           </div>
 
           {/* Category Filters */}
-          <div className="bg-white px-4 py-3 border-b border-[#e0e0e0] flex gap-2 overflow-x-auto shrink-0">
+          <div className="bg-white px-2 sm:px-4 py-2 sm:py-3 border-b border-[#e0e0e0] flex gap-1 sm:gap-2 overflow-x-auto shrink-0 scrollbar-hide">
             <button
               onClick={() => setActiveCategory("all")}
-              className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+              className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
                 activeCategory === "all"
                   ? "bg-accent-orange text-white shadow-float"
                   : "bg-[#f5f5f5] text-[#5a5a5a] hover:bg-[#e0e0e0]"
@@ -292,7 +371,7 @@ export function CashierPage() {
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
                   activeCategory === cat.id
                     ? "bg-accent-orange text-white shadow-float"
                     : "bg-[#f5f5f5] text-[#5a5a5a] hover:bg-[#e0e0e0]"
@@ -304,16 +383,21 @@ export function CashierPage() {
           </div>
 
           {/* Product Grid */}
-          <div className="flex-1 overflow-auto p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="flex-1 overflow-auto p-2 sm:p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
               {filteredProducts.map((product) => {
                 const inCart = cart.find((c) => c.product_id === product.id);
                 return (
                   <button
                     key={product.id}
-                    onClick={() => handleProductClick(product)}
-                    className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:scale-[1.03] transition-all duration-200 text-left group ${
-                      inCart ? "ring-4 ring-[#ff9e2c] bg-orange-50/50" : ""
+                    onClick={() => {
+                      if (!availabilityMap.get(product.id)) return;
+                      handleProductClick(product);
+                    }}
+                    className={`bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:scale-[1.03] transition-all duration-200 text-left group ${
+                      inCart
+                        ? "ring-2 sm:ring-4 ring-[#ff9e2c] bg-orange-50/50"
+                        : ""
                     }`}
                   >
                     <div className="aspect-square bg-[#f5f5f5] relative overflow-hidden">
@@ -325,27 +409,27 @@ export function CashierPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <ShoppingCart className="w-10 h-10 text-[#e0e0e0]" />
+                          <ShoppingCart className="w-8 h-8 sm:w-10 sm:h-10 text-[#e0e0e0]" />
                         </div>
                       )}
-                      {!product.is_available && (
+                      {!availabilityMap.get(product.id) && (
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                           <span className="text-white text-xs font-bold uppercase">
-                            Unavailable
+                            No Stock
                           </span>
                         </div>
                       )}
                       {inCart && (
-                        <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-accent-orange text-white flex items-center justify-center text-xs font-bold shadow-md">
+                        <div className="absolute top-1 sm:top-2 right-1 sm:right-2 w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-accent-orange text-white flex items-center justify-center text-xs font-bold shadow-md">
                           {inCart.qty}
                         </div>
                       )}
                     </div>
-                    <div className="p-3">
-                      <h3 className="font-heading font-semibold text-[#2c2c2c] text-sm truncate">
+                    <div className="p-2 sm:p-3">
+                      <h3 className="font-heading font-semibold text-[#2c2c2c] text-xs sm:text-sm truncate">
                         {product.name}
                       </h3>
-                      <p className="text-accent-orange font-mono font-semibold text-sm mt-0.5">
+                      <p className="text-accent-orange font-mono font-semibold text-xs sm:text-sm mt-0.5">
                         P{product.price.toFixed(2)}
                       </p>
                     </div>
@@ -359,7 +443,7 @@ export function CashierPage() {
 
       {/* Payment Screen */}
       {checkoutStep === "payment" && (
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
           <button
             onClick={() => setCheckoutStep("catalog")}
             className="absolute top-4 left-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-[#2c2c2c]"
@@ -451,9 +535,9 @@ export function CashierPage() {
         </div>
       )}
 
-      {/* Right: Cart Sidebar */}
+      {/* Right: Cart Sidebar - Hidden on Mobile */}
       {checkoutStep === "catalog" && (
-        <div className="w-[360px] bg-white border-l border-[#e0e0e0] flex flex-col shrink-0 shadow-lg">
+        <div className="hidden lg:block w-[360px] bg-white border-l border-[#e0e0e0] flex flex-col shrink-0 shadow-lg">
           {/* Header */}
           <div className="p-4 border-b border-[#e0e0e0]">
             <h2 className="font-heading font-bold text-xl text-[#2c2c2c]">
@@ -625,6 +709,161 @@ export function CashierPage() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Cart Button - Mobile (when cart has items) */}
+      {checkoutStep === "catalog" && cart.length > 0 && (
+        <button
+          onClick={() => setShowCartModal(true)}
+          className="lg:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-accent-orange text-white flex items-center justify-center shadow-float hover:bg-accent-hover transition-all z-40"
+        >
+          <ShoppingCart className="w-6 h-6" />
+          <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-danger-red text-white text-xs flex items-center justify-center font-bold">
+            {cartCount}
+          </span>
+        </button>
+      )}
+
+      {/* Cart Modal - Mobile */}
+      {showCartModal && checkoutStep === "catalog" && (
+        <div
+          className="fixed inset-0 z-50 flex items-end lg:hidden"
+          style={{ background: "rgba(0, 0, 0, 0.4)" }}
+          onClick={() => setShowCartModal(false)}
+        >
+          <div
+            className="bg-white rounded-t-3xl w-full max-h-[80vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-[#e0e0e0] flex items-center justify-between">
+              <div>
+                <h2 className="font-heading font-bold text-xl text-[#2c2c2c]">
+                  Current Order
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {cartCount} items
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCartModal(false)}
+                className="w-8 h-8 rounded-full hover:bg-[#f5f5f5] flex items-center justify-center"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Cart Items */}
+            <div className="flex-1 overflow-auto p-4 space-y-2">
+              {cart.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                  <ShoppingCart className="w-16 h-16 text-[#e0e0e0] mb-3" />
+                  <p className="text-muted-foreground font-heading">
+                    Your cart is empty
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Tap a product to add it
+                  </p>
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div
+                    key={`${item.product_id}-${item.variant_id || ""}`}
+                    className="flex items-center gap-3 bg-[#f5f5f5] rounded-xl p-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-[#2c2c2c] truncate">
+                        {item.product_name}
+                      </p>
+                      {item.variant_name && (
+                        <p className="text-xs text-muted-foreground">
+                          {item.variant_name}
+                        </p>
+                      )}
+                      <p className="text-xs text-accent-orange font-mono mt-0.5">
+                        P{item.price.toFixed(2)} x {item.qty}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() =>
+                          updateQty(
+                            item.product_id,
+                            item.qty - 1,
+                            item.variant_id,
+                          )
+                        }
+                        className="w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-sm hover:shadow transition-shadow"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="w-6 text-center font-mono text-sm font-medium">
+                        {item.qty}
+                      </span>
+                      <button
+                        onClick={() =>
+                          updateQty(
+                            item.product_id,
+                            item.qty + 1,
+                            item.variant_id,
+                          )
+                        }
+                        className="w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-sm hover:shadow transition-shadow"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          removeFromCart(item.product_id, item.variant_id)
+                        }
+                        className="w-7 h-7 rounded-full bg-red-50 flex items-center justify-center ml-1 hover:bg-red-100"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-danger-red" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            {cart.length > 0 && (
+              <div className="p-4 border-t border-[#e0e0e0] space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-mono">P{total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Service Charge</span>
+                  <span className="font-mono">P{serviceCharge.toFixed(2)}</span>
+                </div>
+                <div className="receipt-line" />
+                <div className="flex justify-between">
+                  <span className="font-heading font-bold text-lg">Total</span>
+                  <span className="font-heading font-bold text-2xl text-accent-orange">
+                    P{grandTotal.toFixed(2)}
+                  </span>
+                </div>
+                <Button
+                  onClick={() => {
+                    setShowCartModal(false);
+                    setCheckoutStep("payment");
+                  }}
+                  className="w-full h-14 rounded-full bg-accent-orange hover:bg-accent-hover text-white text-lg font-heading font-semibold shadow-float active:scale-[0.98] transition-transform mt-2"
+                >
+                  <Send className="w-5 h-5 mr-2" />
+                  Checkout
+                </Button>
+                <button
+                  onClick={clearCart}
+                  className="w-full text-center text-xs text-muted-foreground hover:text-danger-red py-1 transition-colors"
+                >
+                  Clear cart
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
