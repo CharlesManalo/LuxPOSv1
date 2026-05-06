@@ -84,9 +84,10 @@ CREATE POLICY "Super admins can delete tenants" ON tenants
     FOR DELETE USING (is_super_admin());
 
 -- USERS POLICIES
--- Users can view users in their tenant (or all if super admin)
-CREATE POLICY "Users can view users in their tenant" ON users
+-- Users can always view their own record (needed for initial login)
+CREATE POLICY "Users can view own record" ON users
     FOR SELECT USING (
+        auth_id = auth.uid() OR
         is_super_admin() OR 
         tenant_id = current_user_tenant_id()
     );
