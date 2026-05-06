@@ -12,33 +12,36 @@ function initializeAuth() {
   const supabase = getSupabaseClient();
   const { setUser, setLoading } = useStore.getState();
 
+  // Flag to prevent sign-out from re-triggering the cycle
+  let isSigningOut = false;
+
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === "SIGNED_IN" && session?.user) {
-      // DON'T setLoading(true) here — login() already handles loading
       try {
         const userData = await getUserByAuthId(session.user.id);
         if (userData) {
           setUser(userData);
         } else {
-          console.warn("User not found in database, signing out");
-          setUser(null);
-          await supabase.auth.signOut();
+          // Guard: don't sign out if already in the process
+          if (!isSigningOut) {
+            isSigningOut = true;
+            console.warn("User not found in public.users — signing out");
+            await supabase.auth.signOut();
+            isSigningOut = false;
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
+        // Ignore lock errors — they resolve on their own
+        if (err?.message?.includes("Lock")) return;
         console.error("Auth state change error:", err);
         setUser(null);
-        // Don't sign out here to avoid infinite loops, just clear the user state
       }
     } else if (event === "SIGNED_OUT") {
-      setUser(null);
+      if (!isSigningOut) {
+        setUser(null);
+      }
     }
   });
-
-  // Session check on mount with timeout safety
-  const initTimeout = setTimeout(() => {
-    console.warn("Auth initialization timeout - forcing unblock");
-    setLoading(false); // Force unblock if something hangs
-  }, 5000);
 
   (async () => {
     setLoading(true);
@@ -47,25 +50,18 @@ function initializeAuth() {
         data: { session },
       } = await supabase.auth.getSession();
       if (session?.user) {
-        try {
-          const userData = await getUserByAuthId(session.user.id);
-          if (userData) {
-            setUser(userData);
-          } else {
-            console.warn("User not found in database during init");
-            setUser(null);
-          }
-        } catch (userErr) {
-          console.error("Failed to get user data during init:", userErr);
-          setUser(null);
+        const userData = await getUserByAuthId(session.user.id);
+        if (userData) {
+          setUser(userData);
         }
+        // Don't sign out here — let it just clear loading
       }
-    } catch (err) {
-      console.error("Auth initialization error:", err);
-      setUser(null);
+    } catch (err: any) {
+      if (!err?.message?.includes("Lock")) {
+        console.error("Auth initialization error:", err);
+      }
     } finally {
-      clearTimeout(initTimeout);
-      setLoading(false); // Always unblock
+      setLoading(false);
     }
   })();
 }
@@ -91,34 +87,20 @@ export function useAuth() {
           });
 
         if (authError) {
-          if (authError.message.includes("Invalid login credentials")) {
+          if (
+            authError.message.includes("Invalid login credentials") ||
+            authError.status === 400
+          ) {
             setError("Incorrect email or password. Please try again.");
           } else if (authError.message.includes("Email not confirmed")) {
             setError("Please confirm your email before logging in.");
-          } else if (authError.status === 400) {
-            setError(
-              "Invalid email or password. Please check your credentials.",
-            );
-          } else if (
-            authError.message.includes("User not found") ||
-            authError.message.includes("no account")
-          ) {
-            setError(
-              "No account found with this email. Please contact your administrator.",
-            );
           } else {
-            setError(
-              authError.message ||
-                "Login failed. Please try again or contact your administrator.",
-            );
+            setError(authError.message || "Login failed. Please try again.");
           }
           return false;
         }
 
-        if (data.user) {
-          // The auth state change listener will handle setting the user
-          return true;
-        }
+        if (data.user) return true;
 
         setError("Login failed");
         return false;

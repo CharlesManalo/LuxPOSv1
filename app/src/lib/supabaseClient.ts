@@ -24,7 +24,13 @@ export function getSupabaseClient() {
     );
   }
 
-  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storageKey: "luxpos-auth-token", // prevents lock conflicts
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
 
   return supabaseInstance;
 }
