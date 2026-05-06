@@ -84,12 +84,6 @@ export function LoginPage() {
       color: "bg-success-green",
       desc: "Manage your business",
     },
-    admin: {
-      icon: Shield,
-      label: "Admin",
-      color: "bg-[#2c2c2c]",
-      desc: "System administration",
-    },
   };
 
   const config = roleConfig[activeRole];
