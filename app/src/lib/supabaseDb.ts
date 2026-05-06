@@ -62,6 +62,15 @@ export async function createTenant(tenantData: {
   return data as Tenant;
 }
 
+export async function deleteTenant(tenantId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("tenants")
+    .delete()
+    .eq("id", tenantId);
+
+  if (error) handleSupabaseError(error);
+}
+
 // --- USER OPERATIONS ---
 
 export async function getUsers(

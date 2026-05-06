@@ -18,7 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
-import { createTenant, deleteTenant, resetAllData } from "@/lib/mockDb";
+import { createTenant, getTenants, deleteTenant } from "@/lib/supabaseDb";
+import { getSupabaseClient } from "@/lib/supabaseClient";
 
 // ── types ──────────────────────────────────────────────────────────────────
 interface OwnerAccount {
@@ -49,25 +50,7 @@ const EMPTY_FORM: NewOwnerForm = {
   logo_url: "",
 };
 
-// ── seed data (2 test accounts) ────────────────────────────────────────────
-const SEED_OWNERS: OwnerAccount[] = [
-  {
-    id: "seed-1",
-    name: "Silogan ni Juan",
-    slug: "silogan-ni-juan",
-    logo_url: "",
-    owner_email: "juan@silogan.ph",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
-  },
-  {
-    id: "seed-2",
-    name: "Tapsi Express",
-    slug: "tapsi-express",
-    logo_url: "",
-    owner_email: "tapsi@express.ph",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-  },
-];
+// ── load tenants from database ────────────────────────────────────────────
 
 // ── root component ─────────────────────────────────────────────────────────
 export function AdminPage() {
@@ -155,7 +138,8 @@ export function AdminPage() {
 
 // ── Owner Accounts Panel ───────────────────────────────────────────────────
 function OwnerAccountsPanel() {
-  const [owners, setOwners] = useState<OwnerAccount[]>(SEED_OWNERS);
+  const [owners, setOwners] = useState<OwnerAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<NewOwnerForm>(EMPTY_FORM);
   const [showPassword, setShowPassword] = useState(false);
@@ -167,6 +151,30 @@ function OwnerAccountsPanel() {
     Partial<Record<keyof NewOwnerForm, string>>
   >({});
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // Load tenants from database on mount
+  useEffect(() => {
+    const loadTenants = async () => {
+      try {
+        const tenants = await getTenants();
+        // Convert Tenant[] to OwnerAccount[]
+        const ownerAccounts: OwnerAccount[] = tenants.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          logo_url: t.logo_url || "",
+          owner_email: t.owner_email || "",
+          created_at: t.created_at,
+        }));
+        setOwners(ownerAccounts);
+      } catch (err) {
+        console.error("Failed to load tenants:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadTenants();
+  }, []);
 
   // auto-generate slug from shop name
   const handleShopNameChange = (val: string) => {
@@ -200,8 +208,23 @@ function OwnerAccountsPanel() {
     if (!validate()) return;
     setSaveStatus("saving");
 
-    // Create tenant in mockDb
-    await createTenant({
+    // Create Supabase Auth user first
+    const supabase = getSupabaseClient();
+    const { data: authData, error: authError } =
+      await supabase.auth.admin.createUser({
+        email: form.email,
+        password: form.password,
+        email_confirm: true,
+      });
+
+    if (authError) {
+      setSaveStatus("idle");
+      alert("Failed to create auth user: " + authError.message);
+      return;
+    }
+
+    // Create tenant in database
+    const newTenant = await createTenant({
       name: form.shopName.trim(),
       slug: form.slug || form.shopName.toLowerCase().replace(/\s+/g, "-"),
       receipt_printing_enabled: true,
@@ -215,11 +238,21 @@ function OwnerAccountsPanel() {
       },
     });
 
+    // Create owner user in database linked to tenant
+    await supabase.from("users").insert({
+      auth_id: authData.user.id,
+      tenant_id: newTenant.id,
+      email: form.email,
+      full_name: form.shopName.trim(),
+      role: "owner",
+      is_active: true,
+    });
+
     // Add to local list for immediate feedback
     const newOwner: OwnerAccount = {
-      id: `owner-${Date.now()}`,
+      id: newTenant.id,
       name: form.shopName.trim(),
-      slug: form.slug,
+      slug: form.slug || form.shopName.toLowerCase().replace(/\s+/g, "-"),
       logo_url: form.logo_url,
       owner_email: form.email,
       created_at: new Date().toISOString(),
@@ -239,8 +272,13 @@ function OwnerAccountsPanel() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete "${name}" and all its data? This cannot be undone.`))
       return;
-    await deleteTenant(id);
-    setOwners((prev) => prev.filter((o) => o.id !== id));
+    try {
+      await deleteTenant(id);
+      setOwners((prev) => prev.filter((o) => o.id !== id));
+    } catch (err) {
+      console.error("Failed to delete tenant:", err);
+      alert("Failed to delete tenant. Please try again.");
+    }
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -528,7 +566,12 @@ function OwnerAccountsPanel() {
         className="bg-white overflow-hidden"
         style={{ border: "1px solid #e0e0e0", borderRadius: 10 }}
       >
-        {owners.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-16 text-[#b0b0b0]">
+            <div className="w-8 h-8 border-2 border-[#e0e0e0] border-t-[#2c2c2c] rounded-full animate-spin mb-3" />
+            <p className="text-sm">Loading owner accounts...</p>
+          </div>
+        ) : owners.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-[#b0b0b0]">
             <Store className="w-10 h-10 mb-3" />
             <p className="text-sm">No owner accounts yet.</p>
@@ -642,14 +685,9 @@ function OwnerAccountsPanel() {
 // ── System Panel ───────────────────────────────────────────────────────────
 function SystemPanel() {
   const handleReset = async () => {
-    if (
-      !confirm(
-        "Reset ALL data? This deletes every tenant, user, and order. Cannot be undone.",
-      )
-    )
-      return;
-    await resetAllData();
-    window.location.reload();
+    alert(
+      "Reset all data feature coming soon. Please contact admin for manual database reset.",
+    );
   };
 
   return (
