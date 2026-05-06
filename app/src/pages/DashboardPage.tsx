@@ -987,8 +987,7 @@ function InventoryTab({
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Unit</label>
-                <input
-                  type="text"
+                <select
                   value={newIngredient.unit}
                   onChange={(e) =>
                     setNewIngredient((prev) => ({
@@ -997,8 +996,19 @@ function InventoryTab({
                     }))
                   }
                   className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg"
-                  placeholder="e.g., kg, pcs, L"
-                />
+                >
+                  <option value="">Select Unit</option>
+                  <option value="pcs">Pieces (pcs)</option>
+                  <option value="kg">Kilograms (kg)</option>
+                  <option value="L">Liters (L)</option>
+                  <option value="g">Grams (g)</option>
+                  <option value="mL">Milliliters (mL)</option>
+                  <option value="box">Box</option>
+                  <option value="bottle">Bottle</option>
+                  <option value="pack">Pack</option>
+                  <option value="dozen">Dozen</option>
+                  <option value="unit">Unit</option>
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
