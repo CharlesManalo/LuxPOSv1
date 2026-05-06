@@ -58,8 +58,13 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState<"owners" | "system">("owners");
 
   useEffect(() => {
-    if (currentUser && currentUser.role !== "admin") {
-      navigate("/cashier");
+    // Redirect if user is not authenticated or not an admin
+    if (!currentUser || currentUser.role !== "admin") {
+      if (!currentUser) {
+        navigate("/login");
+      } else {
+        navigate("/cashier");
+      }
     }
   }, [currentUser, navigate]);
 
