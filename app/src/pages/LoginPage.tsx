@@ -23,9 +23,15 @@ export function LoginPage() {
     setEmail(""); // Clear email when switching roles
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || isLoading) return;
+
+    setIsSubmitting(true);
     const success = await login(email, password);
+    setIsSubmitting(false);
     if (success) {
       // Wait for auth state to update and then navigate
       setTimeout(async () => {
@@ -205,10 +211,10 @@ export function LoginPage() {
 
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || isSubmitting}
               className={`w-full h-12 rounded-full ${config.color} hover:opacity-90 text-white font-semibold text-base shadow-lg transition-all active:scale-[0.98] disabled:opacity-50`}
             >
-              {isLoading ? (
+              {isLoading || isSubmitting ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
