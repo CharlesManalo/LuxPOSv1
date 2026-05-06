@@ -13,7 +13,9 @@ import type {
   OrderItem,
   UserRole,
   ProductRecipe,
-  Notification, // Added missing import
+  Notification,
+  DashboardStats,
+  PaymentMethod,
 } from "@/types";
 
 // Helper function to handle Supabase errors
@@ -205,6 +207,110 @@ export async function createCashier(cashierData: {
 
 export async function deleteCashier(cashierId: string): Promise<void> {
   return deleteUser(cashierId);
+}
+
+// --- DASHBOARD STATS ---
+
+export async function getDashboardStats(
+  tenantId: string,
+): Promise<DashboardStats> {
+  const supabase = getSupabase();
+
+  // Get orders for revenue calculation
+  const { data: orders, error: ordersError } = await supabase
+    .from("orders")
+    .select("total, payment_method, created_at")
+    .eq("tenant_id", tenantId)
+    .eq("status", "completed");
+
+  if (ordersError) {
+    console.error("Error fetching orders:", ordersError);
+  }
+
+  // Get products count
+  const { count: productsCount, error: productsError } = await supabase
+    .from("products")
+    .select("*", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+
+  if (productsError) {
+    console.error("Error fetching products count:", productsError);
+  }
+
+  // Get low stock ingredients count
+  const { data: ingredients, error: ingredientsError } = await supabase
+    .from("ingredients")
+    .select("stock_qty, low_stock_threshold")
+    .eq("tenant_id", tenantId);
+
+  if (ingredientsError) {
+    console.error("Error fetching ingredients:", ingredientsError);
+  }
+
+  // Calculate stats
+  const totalRevenue =
+    orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+  const totalOrders = orders?.length || 0;
+  const totalProducts = productsCount || 0;
+
+  // Calculate low stock count
+  const lowStockCount =
+    ingredients?.filter(
+      (i) => i.stock_qty > 0 && i.stock_qty <= i.low_stock_threshold,
+    ).length || 0;
+
+  // Calculate payment breakdown
+  const paymentMap = new Map<string, { amount: number; count: number }>();
+  orders?.forEach((order) => {
+    const method = order.payment_method || "cash";
+    const current = paymentMap.get(method) || { amount: 0, count: 0 };
+    paymentMap.set(method, {
+      amount: current.amount + (order.total || 0),
+      count: current.count + 1,
+    });
+  });
+  const paymentBreakdown = Array.from(paymentMap.entries()).map(
+    ([method, data]) => ({
+      method: method as PaymentMethod,
+      amount: data.amount,
+      count: data.count,
+    }),
+  );
+
+  // Calculate daily revenue (last 14 days)
+  const dailyRevenueMap = new Map<string, number>();
+  const today = new Date();
+  for (let i = 13; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split("T")[0];
+    dailyRevenueMap.set(dateStr, 0);
+  }
+
+  orders?.forEach((order) => {
+    const dateStr = order.created_at?.split("T")[0];
+    if (dateStr && dailyRevenueMap.has(dateStr)) {
+      const current = dailyRevenueMap.get(dateStr) || 0;
+      dailyRevenueMap.set(dateStr, current + (order.total || 0));
+    }
+  });
+
+  const dailyRevenue = Array.from(dailyRevenueMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, amount]) => ({ date, amount }));
+
+  // Get top products (simplified - would need order_items data)
+  const topProducts: { name: string; qty: number; revenue: number }[] = [];
+
+  return {
+    totalRevenue,
+    totalOrders,
+    totalProducts,
+    lowStockCount,
+    paymentBreakdown,
+    dailyRevenue,
+    topProducts,
+  };
 }
 
 // --- CATEGORY OPERATIONS ---

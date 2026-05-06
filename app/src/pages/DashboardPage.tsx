@@ -120,9 +120,10 @@ export function DashboardPage() {
 
     // Compute inventory alerts from real ingredient data (Fix #1)
     const lowStockItems = ings.filter(
-      (i) => i.stock_qty > 0 && i.stock_qty <= i.low_stock_threshold,
+      (i: Ingredient) =>
+        i.stock_qty > 0 && i.stock_qty <= i.low_stock_threshold,
     );
-    const outOfStockItems = ings.filter((i) => i.stock_qty <= 0);
+    const outOfStockItems = ings.filter((i: Ingredient) => i.stock_qty <= 0);
     setInventoryAlerts({
       low: lowStockItems.length,
       out: outOfStockItems.length,
@@ -151,13 +152,13 @@ export function DashboardPage() {
 
   const handleApproveNotif = async (id: string) => {
     if (!currentUser) return;
-    await updateNotificationStatus(id, "approved", currentUser.id);
+    await updateNotificationStatus(id, "approved");
     loadData();
   };
 
   const handleRejectNotif = async (id: string) => {
     if (!currentUser) return;
-    await updateNotificationStatus(id, "rejected", currentUser.id);
+    await updateNotificationStatus(id, "rejected");
     loadData();
   };
 
