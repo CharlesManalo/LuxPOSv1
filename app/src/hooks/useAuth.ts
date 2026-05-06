@@ -79,7 +79,7 @@ export function useAuth() {
             tenant_id: "admin-tenant",
             email: ADMIN_EMAIL,
             full_name: "Admin User",
-            role: "super_admin",
+            role: "admin",
             avatar_url: null,
             created_at: new Date().toISOString(),
           });

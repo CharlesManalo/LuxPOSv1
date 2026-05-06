@@ -66,7 +66,7 @@ function App() {
           path="/admin"
           element={
             <ProtectedRoute
-              allowedRoles={["admin", "owner", "super_admin"]}
+              allowedRoles={["admin", "owner"]}
               userRole={currentUser?.role}
             >
               <AdminPage />
@@ -130,7 +130,6 @@ function ProtectedRoute({
 function getRedirectPath(role?: string): string {
   switch (role) {
     case "admin":
-    case "super_admin":
       return "/admin";
     case "owner":
     case "tenant":

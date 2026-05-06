@@ -59,7 +59,7 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState<"owners" | "system">("owners");
 
   useEffect(() => {
-    if (currentUser && currentUser.role !== "super_admin") {
+    if (currentUser && currentUser.role !== "admin") {
       navigate("/cashier");
     }
   }, [currentUser, navigate]);

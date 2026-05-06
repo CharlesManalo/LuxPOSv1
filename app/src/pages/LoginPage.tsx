@@ -84,9 +84,9 @@ export function LoginPage() {
       color: "bg-success-green",
       desc: "Manage your business",
     },
-    super_admin: {
+    admin: {
       icon: Shield,
-      label: "Super Admin",
+      label: "Admin",
       color: "bg-[#2c2c2c]",
       desc: "System administration",
     },
@@ -102,9 +102,9 @@ export function LoginPage() {
     >
       {/* ── Admin shortcut — fixed top-left ── */}
       <button
-        onClick={() => handleRoleChange("super_admin")}
+        onClick={() => handleRoleChange("admin")}
         className={`fixed top-4 left-4 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-150 ${
-          activeRole === "super_admin"
+          activeRole === "admin"
             ? "bg-[#2c2c2c] text-white border-[#2c2c2c]"
             : "bg-white text-[#5a5a5a] border-[#e0e0e0] hover:border-[#2c2c2c] hover:text-[#2c2c2c]"
         }`}
