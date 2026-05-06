@@ -6,12 +6,11 @@ import { AdminPage } from "@/pages/AdminPage";
 import { CashierPage } from "@/pages/CashierPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { useAuth } from "@/hooks/useAuth";
+import type { AppUser } from "@/types";
 
-function AdminButton() {
+function AdminButton({ currentUser }: { currentUser: AppUser | null }) {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
 
-  // Only show for admin/owner users
   if (
     !currentUser ||
     (currentUser.role !== "admin" && currentUser.role !== "owner")
@@ -51,7 +50,7 @@ function App() {
 
   return (
     <>
-      <AdminButton />
+      <AdminButton currentUser={currentUser} />
       <Routes>
         <Route
           path="/login"
