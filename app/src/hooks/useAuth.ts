@@ -62,30 +62,11 @@ export function useAuth() {
     initializeAuth();
   }, []);
 
-  // Hardcoded admin for development
-  const ADMIN_EMAIL = "charlesaustinmanalo@gmail.com";
-  const ADMIN_PASSWORD = "admin123@lux";
-
   const login = useCallback(
     async (email: string, password: string) => {
       setError(null);
       setLoading(true);
       try {
-        // Hardcoded admin bypass
-        if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-          const { setUser } = useStore.getState();
-          setUser({
-            id: "admin-001",
-            tenant_id: "admin-tenant",
-            email: ADMIN_EMAIL,
-            full_name: "Admin User",
-            role: "admin",
-            avatar_url: null,
-            created_at: new Date().toISOString(),
-          });
-          return true;
-        }
-
         const supabase = getSupabaseClient();
         const { data, error: authError } =
           await supabase.auth.signInWithPassword({
@@ -102,8 +83,18 @@ export function useAuth() {
             setError(
               "Invalid email or password. Please check your credentials.",
             );
+          } else if (
+            authError.message.includes("User not found") ||
+            authError.message.includes("no account")
+          ) {
+            setError(
+              "No account found with this email. Please contact your administrator.",
+            );
           } else {
-            setError(authError.message);
+            setError(
+              authError.message ||
+                "Login failed. Please try again or contact your administrator.",
+            );
           }
           return false;
         }

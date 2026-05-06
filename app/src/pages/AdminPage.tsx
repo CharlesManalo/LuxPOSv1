@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import {
-  Shield,
   Users,
   Database,
   Plus,
@@ -81,12 +80,6 @@ export function AdminPage() {
           className="h-14 flex items-center gap-3 px-4"
           style={{ borderBottom: "1px solid #e0e0e0" }}
         >
-          <div
-            className="w-8 h-8 flex items-center justify-center rounded-lg"
-            style={{ background: "#2c2c2c" }}
-          >
-            <Shield className="w-4 h-4 text-white" />
-          </div>
           <span className="font-heading font-bold text-[#2c2c2c]">
             LuxPOS Admin
           </span>
@@ -129,6 +122,12 @@ export function AdminPage() {
 
       {/* ── Main ── */}
       <main className="flex-1 overflow-auto">
+        {/* Welcome Header */}
+        <div className="bg-white border-b border-[#e0e0e0] px-8 py-4">
+          <h1 className="text-lg font-bold text-[#2c2c2c] font-heading">
+            Welcome {currentUser?.full_name || "Admin"} ({currentUser?.email})
+          </h1>
+        </div>
         {activeTab === "owners" && <OwnerAccountsPanel />}
         {activeTab === "system" && <SystemPanel />}
       </main>

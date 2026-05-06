@@ -6,12 +6,14 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useStore } from "@/stores/useStore";
 import { getTenant } from "@/lib/supabaseDb";
+import { useToast } from "@/components/ui/toast";
 import type { UserRole } from "@/types";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { login, error, isLoading } = useAuth();
   const { setCurrentTenant } = useStore();
+  const { showToast, ToastContainer } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,10 +31,22 @@ export function LoginPage() {
     e.preventDefault();
     if (isSubmitting || isLoading) return;
 
+    // Validate inputs
+    if (!email.trim()) {
+      showToast("Please enter your email address", "error");
+      return;
+    }
+    if (!password.trim()) {
+      showToast("Please enter your password", "error");
+      return;
+    }
+
     setIsSubmitting(true);
     const success = await login(email, password);
     setIsSubmitting(false);
+
     if (success) {
+      showToast("Login successful!", "success");
       // Wait for auth state to update and then navigate
       setTimeout(async () => {
         const { currentUser } = useStore.getState();
@@ -53,6 +67,18 @@ export function LoginPage() {
           }
         }
       }, 100);
+    } else if (error) {
+      // Show specific error message based on the error
+      if (
+        error.includes("Invalid login credentials") ||
+        error.includes("Incorrect email or password")
+      ) {
+        showToast("Incorrect email or password. Please try again.", "error");
+      } else if (error.includes("Email not confirmed")) {
+        showToast("Please confirm your email before logging in.", "warning");
+      } else {
+        showToast(error, "error");
+      }
     }
   };
 
@@ -194,12 +220,6 @@ export function LoginPage() {
               </div>
             </div>
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600">
-                {error}
-              </div>
-            )}
-
             <Button
               type="submit"
               disabled={isLoading || isSubmitting}
@@ -217,6 +237,9 @@ export function LoginPage() {
           </form>
         </div>
       </div>
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 }
