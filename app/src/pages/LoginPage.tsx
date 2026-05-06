@@ -222,10 +222,10 @@ export function LoginPage() {
 
             <Button
               type="submit"
-              disabled={isLoading || isSubmitting}
+              disabled={isSubmitting}
               className={`w-full h-12 rounded-full ${config.color} hover:opacity-90 text-white font-semibold text-base shadow-lg transition-all active:scale-[0.98] disabled:opacity-50`}
             >
-              {isLoading || isSubmitting ? (
+              {isSubmitting ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
