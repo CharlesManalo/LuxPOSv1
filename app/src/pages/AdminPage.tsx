@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
-import { createTenant, getTenants, deleteTenant } from "@/lib/supabaseDb";
+import { getTenants, deleteTenant } from "@/lib/supabaseDb";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
 // ── types ──────────────────────────────────────────────────────────────────
