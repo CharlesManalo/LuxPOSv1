@@ -1,8 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Declare process for build environment
-declare const process: any;
-
 let supabaseInstance: ReturnType<typeof createClient> | null = null;
 
 export function getSupabaseClient() {
@@ -10,16 +7,17 @@ export function getSupabaseClient() {
     return supabaseInstance;
   }
 
-  // Use fallback values for build environment
+  // Use Vite environment variables
   const supabaseUrl =
-    process.env.VITE_SUPABASE_URL || "https://cnycpwqkxytzinejlhkk.supabase.co";
-  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    import.meta.env.VITE_SUPABASE_URL ||
+    "https://cnycpwqkxytzinejlhkk.supabase.co";
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseAnonKey) {
     console.error("VITE_SUPABASE_ANON_KEY is not configured");
     console.error(
       "Available env vars:",
-      Object.keys(process.env).filter((k) => k.includes("SUPABASE")),
+      Object.keys(import.meta.env).filter((k) => k.includes("SUPABASE")),
     );
     throw new Error(
       "Supabase anonymous key is required. Please check environment variables.",
