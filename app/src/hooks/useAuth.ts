@@ -1,45 +1,62 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useStore } from "@/stores/useStore";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 import { getUserByAuthId } from "@/lib/supabaseDb";
 
+// Global singleton instance to prevent multiple Supabase clients
+let globalSupabaseClient: ReturnType<typeof getSupabaseClient> | null = null;
+
+function getSupabaseSingleton() {
+  if (!globalSupabaseClient) {
+    globalSupabaseClient = getSupabaseClient();
+  }
+  return globalSupabaseClient;
+}
+
 export function useAuth() {
   const { currentUser, setUser, setLoading, isLoading } = useStore();
   const [error, setError] = useState<string | null>(null);
+  const subscriptionRef = useRef<any>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    // Set up auth state listener
-    const supabase = getSupabaseClient();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return; // Prevent memory leaks
+    // Set up auth state listener only once
+    const supabase = getSupabaseSingleton();
 
-      if (event === "SIGNED_IN" && session?.user) {
-        setLoading(true);
-        try {
-          // Get user data from our users table
-          const userData = await getUserByAuthId(session.user.id);
-          if (userData) {
-            setUser(userData);
-          } else {
-            setError("User profile not found. Please contact administrator.");
+    // Only set up listener if we don't already have one
+    if (!subscriptionRef.current) {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!mounted) return; // Prevent memory leaks
+
+        if (event === "SIGNED_IN" && session?.user) {
+          setLoading(true);
+          try {
+            // Get user data from our users table
+            const userData = await getUserByAuthId(session.user.id);
+            if (userData) {
+              setUser(userData);
+            } else {
+              setError("User profile not found. Please contact administrator.");
+              await supabase.auth.signOut();
+            }
+          } catch (err) {
+            console.error("Auth initialization error:", err);
+            setError("Failed to load user profile");
             await supabase.auth.signOut();
+          } finally {
+            setLoading(false);
           }
-        } catch (err) {
-          console.error("Auth initialization error:", err);
-          setError("Failed to load user profile");
-          await supabase.auth.signOut();
-        } finally {
-          setLoading(false);
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          setError(null);
         }
-      } else if (event === "SIGNED_OUT") {
-        setUser(null);
-        setError(null);
-      }
-    });
+      });
+
+      subscriptionRef.current = subscription;
+    }
 
     // Check for existing session
     const initializeAuth = async () => {
@@ -66,7 +83,10 @@ export function useAuth() {
 
     return () => {
       mounted = false; // Cleanup
-      subscription.unsubscribe();
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
     };
   }, [setUser, setLoading]);
 
@@ -75,7 +95,7 @@ export function useAuth() {
       setError(null);
       setLoading(true);
       try {
-        const supabase = getSupabaseClient();
+        const supabase = getSupabaseSingleton();
         const { data, error: authError } =
           await supabase.auth.signInWithPassword({
             email,
@@ -107,7 +127,7 @@ export function useAuth() {
   const logout = useCallback(async () => {
     setError(null);
     try {
-      const supabase = getSupabaseClient();
+      const supabase = getSupabaseSingleton();
       await supabase.auth.signOut();
       // The auth state change listener will handle clearing the user
     } catch (err) {
