@@ -94,7 +94,17 @@ export function useAuth() {
           });
 
         if (authError) {
-          setError(authError.message);
+          if (authError.message.includes("Invalid login credentials")) {
+            setError("Incorrect email or password. Please try again.");
+          } else if (authError.message.includes("Email not confirmed")) {
+            setError("Please confirm your email before logging in.");
+          } else if (authError.status === 400) {
+            setError(
+              "Invalid email or password. Please check your credentials.",
+            );
+          } else {
+            setError(authError.message);
+          }
           return false;
         }
 
