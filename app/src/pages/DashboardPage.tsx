@@ -33,6 +33,8 @@ import {
   getIngredients,
   getProducts,
   getCategories,
+  createCategory,
+  deleteCategory,
   createIngredient,
   deleteIngredient,
   createProduct,
@@ -559,11 +561,17 @@ function InventoryTab({
   currentUser: any;
 }) {
   const [activeSection, setActiveSection] = useState<
-    "ingredients" | "products"
+    "categories" | "ingredients" | "products"
   >("ingredients");
+  const [showAddCategory, setShowAddCategory] = useState(false);
   const [showAddIngredient, setShowAddIngredient] = useState(false);
   const [showAddProduct, setShowAddProduct] = useState(false);
   // Form states
+  const [newCategory, setNewCategory] = useState({
+    name: "",
+    sort_order: 0,
+  });
+
   const [newIngredient, setNewIngredient] = useState({
     name: "",
     unit: "",
@@ -604,6 +612,18 @@ function InventoryTab({
     }
   };
 
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!currentUser?.tenant_id) return;
+
+    try {
+      await deleteCategory(categoryId);
+      onProductUpdate(); // Refresh data
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      alert("Failed to delete category. Please try again.");
+    }
+  };
+
   const handleAddIngredient = async () => {
     if (!newIngredient.name.trim()) return;
     if (!currentUser?.tenant_id) return;
@@ -632,6 +652,32 @@ function InventoryTab({
     } catch (error) {
       console.error("Error creating ingredient:", error);
       alert("Failed to create ingredient. Please try again.");
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategory.name.trim()) return;
+    if (!currentUser?.tenant_id) return;
+
+    try {
+      const categoryData = {
+        name: newCategory.name,
+        sort_order: newCategory.sort_order,
+      };
+
+      await createCategory({
+        ...categoryData,
+        tenant_id: currentUser.tenant_id,
+      });
+      setShowAddCategory(false);
+      setNewCategory({
+        name: "",
+        sort_order: 0,
+      });
+      onProductUpdate(); // Refresh to show new category
+    } catch (error) {
+      console.error("Error creating category:", error);
+      alert("Failed to create category. Please try again.");
     }
   };
 
@@ -744,6 +790,12 @@ function InventoryTab({
         </h3>
         <div className="flex gap-2">
           <button
+            onClick={() => setShowAddCategory(true)}
+            className="px-4 py-2 bg-[#2c2c2c] text-white rounded-lg text-sm font-medium hover:bg-[#3a3a3a]"
+          >
+            + Add Category
+          </button>
+          <button
             onClick={() => setShowAddIngredient(true)}
             className="px-4 py-2 bg-[#2c2c2c] text-white rounded-lg text-sm font-medium hover:bg-[#3a3a3a]"
           >
@@ -760,6 +812,16 @@ function InventoryTab({
 
       {/* Section Tabs */}
       <div className="flex gap-2 border-b border-[#e0e0e0]">
+        <button
+          onClick={() => setActiveSection("categories")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeSection === "categories"
+              ? "border-accent-orange text-accent-orange"
+              : "border-transparent text-muted-foreground hover:text-[#2c2c2c]"
+          }`}
+        >
+          Categories ({categories.length})
+        </button>
         <button
           onClick={() => setActiveSection("ingredients")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -964,6 +1026,43 @@ function InventoryTab({
         </div>
       )}
 
+      {/* CATEGORIES SECTION */}
+      {activeSection === "categories" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-[#f5f5f5]">
+                <tr className="text-left text-xs font-medium text-muted-foreground uppercase">
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Sort Order</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e0e0e0]">
+                {categories.map((cat) => (
+                  <tr key={cat.id} className="hover:bg-[#f5f5f5]/50">
+                    <td className="px-4 py-3">
+                      <span className="font-medium">{cat.name}</span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
+                      {cat.sort_order}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleDeleteCategory(cat.id)}
+                        className="w-6 h-6 rounded bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ADD INGREDIENT MODAL */}
       {showAddIngredient && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1057,6 +1156,65 @@ function InventoryTab({
                 className="flex-1 px-4 py-2 bg-accent-orange text-white rounded-lg text-sm font-medium"
               >
                 Add Ingredient
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD CATEGORY MODAL */}
+      {showAddCategory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add New Category</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Category Name
+                </label>
+                <input
+                  type="text"
+                  value={newCategory.name}
+                  onChange={(e) =>
+                    setNewCategory((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg"
+                  placeholder="e.g., Beverages"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Sort Order
+                </label>
+                <input
+                  type="number"
+                  value={newCategory.sort_order}
+                  onChange={(e) =>
+                    setNewCategory((prev) => ({
+                      ...prev,
+                      sort_order: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowAddCategory(false)}
+                className="flex-1 px-4 py-2 border border-[#e0e0e0] rounded-lg text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddCategory}
+                className="flex-1 px-4 py-2 bg-accent-orange text-white rounded-lg text-sm font-medium"
+              >
+                Add Category
               </button>
             </div>
           </div>

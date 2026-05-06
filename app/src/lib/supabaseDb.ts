@@ -338,6 +338,15 @@ export async function createCategory(
   return data as Category;
 }
 
+export async function deleteCategory(categoryId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("categories")
+    .delete()
+    .eq("id", categoryId);
+
+  if (error) handleSupabaseError(error);
+}
+
 // --- INGREDIENT OPERATIONS ---
 
 export async function getIngredients(tenantId: string): Promise<Ingredient[]> {
