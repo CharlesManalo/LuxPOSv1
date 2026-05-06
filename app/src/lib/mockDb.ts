@@ -105,7 +105,7 @@ export async function signIn(
   if (!user) {
     // Auto-create demo login for known emails
     if (email === "admin@luxpos.app") {
-      const admin = data.users.find((u) => u.role === "super_admin");
+      const admin = data.users.find((u) => u.role === "admin");
       return { user: admin || null, error: null };
     }
     if (email === "juan@silogan.ph") {

@@ -30,7 +30,7 @@ export interface Database {
           id: string;
           auth_id: string;
           tenant_id: string;
-          role: "super_admin" | "tenant" | "cashier" | "admin" | "owner";
+          role: "tenant" | "cashier" | "admin" | "owner";
           full_name: string;
           email: string;
           avatar_url: string | null;
@@ -195,7 +195,7 @@ export interface Database {
       };
     };
     Enums: {
-      user_role: "super_admin" | "tenant" | "cashier" | "admin" | "owner";
+      user_role: "tenant" | "cashier" | "admin" | "owner";
       order_status: "completed" | "voided";
       payment_method: "cash" | "gcash" | "maya";
       notification_type:

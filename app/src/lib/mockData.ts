@@ -33,9 +33,9 @@ export const demoTenant: Tenant = {
 export const demoUsers: AppUser[] = [
   {
     id: "admin-1",
-    tenant_id: "system", // Super admin has no specific tenant
-    role: "super_admin",
-    full_name: "System Super Admin",
+    tenant_id: "system", // Admin has no specific tenant
+    role: "admin",
+    full_name: "System Admin",
     email: "admin@luxpos.app",
     avatar_url: null,
     created_at: "2024-01-01T00:00:00Z",

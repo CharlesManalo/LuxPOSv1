@@ -37,10 +37,7 @@ export function LoginPage() {
       setTimeout(async () => {
         const { currentUser } = useStore.getState();
         if (currentUser) {
-          if (
-            currentUser.role === "admin" ||
-            currentUser.role === "super_admin"
-          ) {
+          if (currentUser.role === "admin") {
             navigate("/admin");
           } else if (
             currentUser.role === "owner" ||

@@ -87,7 +87,7 @@ export function DashboardPage() {
       currentUser.role !== "owner" &&
       currentUser.role !== "tenant"
     ) {
-      if (currentUser.role === "admin" || currentUser.role === "super_admin") {
+      if (currentUser.role === "admin") {
         navigate("/admin");
       } else {
         navigate("/cashier");
