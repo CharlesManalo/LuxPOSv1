@@ -14,7 +14,7 @@ function initializeAuth() {
 
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === "SIGNED_IN" && session?.user) {
-      setLoading(true);
+      // DON'T setLoading(true) here — login() already handles loading
       try {
         const userData = await getUserByAuthId(session.user.id);
         if (userData) {
@@ -26,13 +26,16 @@ function initializeAuth() {
       } catch (err) {
         console.error("Auth state change error:", err);
         setUser(null);
-      } finally {
-        setLoading(false);
       }
     } else if (event === "SIGNED_OUT") {
       setUser(null);
     }
   });
+
+  // Session check on mount with timeout safety
+  const initTimeout = setTimeout(() => {
+    setLoading(false); // Force unblock if something hangs
+  }, 5000);
 
   (async () => {
     setLoading(true);
@@ -49,7 +52,8 @@ function initializeAuth() {
     } catch (err) {
       console.error("Auth initialization error:", err);
     } finally {
-      setLoading(false);
+      clearTimeout(initTimeout);
+      setLoading(false); // Always unblock
     }
   })();
 }
