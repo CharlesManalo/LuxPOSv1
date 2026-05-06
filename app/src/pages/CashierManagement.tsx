@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, User } from "lucide-react";
 import type { AppUser } from "@/types";
-import { getCashiers, createCashier, deleteCashier } from "@/lib/mockDb";
+import { getCashiers, createCashier, deleteCashier } from "@/lib/supabaseDb";
 
 interface CashierManagementProps {
   tenantId: string;

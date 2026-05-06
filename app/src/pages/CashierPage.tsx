@@ -25,7 +25,7 @@ import {
   getCategories,
   getProductVariants,
   getIngredients,
-} from "@/lib/mockDb";
+} from "@/lib/supabaseDb";
 import { createOrderWithInventory } from "@/lib/atomicOrders";
 import type { Product, Category, ProductVariant, PaymentMethod } from "@/types";
 import { Receipt } from "@/components/Receipt";
