@@ -55,7 +55,7 @@ export function CashierPage() {
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [checkoutStep, setCheckoutStep] = useState<
-    "catalog" | "payment" | "success"
+    "catalog" | "payment" | "success" | "receipt"
   >("catalog");
   const [orderNumber, setOrderNumber] = useState("");
   const [receiptConfig, setReceiptConfig] = useState(
