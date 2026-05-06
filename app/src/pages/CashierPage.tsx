@@ -199,9 +199,68 @@ export function CashierPage() {
   const handleSendOrder = async () => {
     if (!currentUser) return;
 
+    const total = getCartTotal();
+
+    // Handle different payment methods
+    if (paymentMethod === "cash") {
+      // Cash payment flow
+      const amountReceived = prompt("Enter amount received from customer.");
+      if (amountReceived === null) return;
+
+      const received = parseFloat(amountReceived);
+      if (isNaN(received) || received < total) {
+        alert("Invalid amount. Amount must be at least the total due.");
+        return;
+      }
+
+      const change = received - total;
+
+      // Show change and options
+      const action = confirm(
+        `Change: ₱${change.toFixed(2)}\n\nProceed with transaction?`,
+      );
+      if (!action) return;
+
+      // Create order with cash payment
+      await createOrderWithPayment(total, "cash", received, change);
+    } else if (paymentMethod === "gcash" || paymentMethod === "maya") {
+      // GCash/Maya payment flow
+      const isExact = confirm("Is payment exact?");
+
+      let received = total;
+      let change = 0;
+
+      if (!isExact) {
+        const amountReceived = prompt("Enter amount received from customer.");
+        if (amountReceived === null) return;
+
+        received = parseFloat(amountReceived);
+        if (isNaN(received) || received < total) {
+          alert("Invalid amount. Amount must be at least the total due.");
+          return;
+        }
+        change = received - total;
+      }
+
+      const paymentLabel = paymentMethod === "gcash" ? "GCash" : "Maya";
+      const reminder =
+        "Verify payment and take a screenshot/photo of the transaction receipt.";
+
+      // Show payment details and options
+      const action = confirm(
+        `Payment: ${paymentLabel}\nChange: ₱${change.toFixed(2)}\n\n${reminder}\n\nProceed with transaction?`,
+      );
+      if (!action) return;
+
+      // Create order with digital payment
+      await createOrderWithPayment(total, paymentMethod, received, change);
+    } else {
+      alert("Please select a payment method.");
+      return;
+    }
+
     // 🔄 ATOMIC ORDER CREATION WITH INVENTORY DEDUCTION
     try {
-      const total = getCartTotal();
       const orderItems = cart.map((item) => ({
         product_id: item.product_id,
         product_name: item.product_name,
@@ -238,7 +297,7 @@ export function CashierPage() {
       setTimeout(() => setShowSuccessFlash(false), 600);
 
       setTimeout(() => {
-        setCheckoutStep("success");
+        setCheckoutStep("receipt");
       }, 300);
     } catch (error) {
       console.error("Order submission failed:", error);
@@ -246,6 +305,18 @@ export function CashierPage() {
         `Order failed: ${error instanceof Error ? error.message : "Please try again."}`,
       );
     }
+  };
+
+  const createOrderWithPayment = async (
+    total: number,
+    method: string,
+    received: number,
+    change: number,
+  ) => {
+    // This function will be expanded with receipt options later
+    console.log(
+      `Creating order: ${method}, Total: ₱${total}, Received: ₱${received}, Change: ₱${change}`,
+    );
   };
 
   const handleNewOrder = () => {
@@ -512,6 +583,22 @@ export function CashierPage() {
               />
             </div>
           )}
+
+          {/* Receipt Options */}
+          <div className="flex gap-4 mb-6">
+            <Button
+              onClick={() => alert("View receipt functionality coming soon!")}
+              className="flex-1 h-12 rounded-full bg-white border-2 border-[#e0e0e0] text-[#2c2c2c] px-4 shadow-float font-heading font-semibold"
+            >
+              View Receipt
+            </Button>
+            <Button
+              onClick={() => alert("Print receipt functionality coming soon!")}
+              className="flex-1 h-12 rounded-full bg-white border-2 border-[#e0e0e0] text-[#2c2c2c] px-4 shadow-float font-heading font-semibold"
+            >
+              Print Receipt
+            </Button>
+          </div>
 
           <Button
             onClick={handleNewOrder}
