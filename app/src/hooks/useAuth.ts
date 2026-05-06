@@ -22,17 +22,14 @@ function initializeAuth() {
         if (userData) {
           setUser(userData);
         } else {
-          // Guard: don't sign out if already in the process
-          if (!isSigningOut) {
-            isSigningOut = true;
-            console.warn("User not found in public.users — signing out");
-            await supabase.auth.signOut();
-            isSigningOut = false;
-          }
+          // DON'T sign out here — just clear the user
+          // Signing out triggers another SIGNED_IN cycle
+          console.warn("User not found in public.users — clearing user state");
+          setUser(null);
         }
       } catch (err: any) {
-        // Ignore lock errors — they resolve on their own
-        if (err?.message?.includes("Lock")) return;
+        if (err?.message?.includes("Lock") || err?.name === "AbortError")
+          return;
         console.error("Auth state change error:", err);
         setUser(null);
       }
