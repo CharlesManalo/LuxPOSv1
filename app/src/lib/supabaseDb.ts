@@ -152,6 +152,61 @@ export async function deleteUser(userId: string): Promise<void> {
   if (error) handleSupabaseError(error);
 }
 
+// Cashier-specific wrapper functions
+export async function getCashiers(tenantId: string): Promise<AppUser[]> {
+  return getUsers(tenantId, "cashier");
+}
+
+export async function createCashier(cashierData: {
+  tenant_id: string;
+  full_name: string;
+  email: string;
+  password?: string;
+}): Promise<AppUser> {
+  const { tenant_id, full_name, email, password = "cashier123" } = cashierData;
+
+  // First create the auth user
+  const { data: authData, error: authError } =
+    await getSupabase().auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+
+  if (authError) {
+    console.error("Failed to create auth user for cashier:", authError);
+    throw new Error(`Failed to create auth user: ${authError.message}`);
+  }
+
+  // Then create the user record in the database
+  const { data, error } = await getSupabase()
+    .from("users")
+    .insert({
+      auth_id: authData.user.id,
+      tenant_id,
+      email,
+      full_name,
+      role: "cashier",
+      is_active: true,
+    } as any)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to create cashier record:", error);
+    // Try to clean up the auth user if database insert fails
+    await getSupabase().auth.admin.deleteUser(authData.user.id);
+    handleSupabaseError(error);
+  }
+
+  if (!data) throw new Error("Failed to create cashier");
+  return data as AppUser;
+}
+
+export async function deleteCashier(cashierId: string): Promise<void> {
+  return deleteUser(cashierId);
+}
+
 // --- CATEGORY OPERATIONS ---
 
 export async function getCategories(tenantId: string): Promise<Category[]> {
