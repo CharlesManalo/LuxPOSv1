@@ -213,90 +213,55 @@ function OwnerAccountsPanel() {
     setSaveStatus("saving");
 
     const supabase = getSupabaseClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    // Create tenant in database first (no auth needed for this)
-    let newTenant;
     try {
-      newTenant = await createTenant({
-        name: form.shopName.trim(),
-        slug: form.slug || form.shopName.toLowerCase().replace(/\s+/g, "-"),
-        receipt_printing_enabled: true,
-        receipt_config: {
-          header_text: form.shopName.trim(),
-          address: "",
-          contact_number: "",
-          footer_message: "Thank you!",
-          paper_width: "80mm",
-          show_cashier_name: true,
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-owner`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password,
+            shopName: form.shopName.trim(),
+            slug: form.slug || form.shopName.toLowerCase().replace(/\s+/g, "-"),
+            logo_url: form.logo_url || null,
+          }),
         },
-      });
+      );
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to create owner");
+
+      const newOwner: OwnerAccount = {
+        id: result.tenant.id,
+        name: result.tenant.name,
+        slug: result.tenant.slug,
+        logo_url: result.tenant.logo_url,
+        owner_email: form.email,
+        created_at: result.tenant.created_at,
+      };
+
+      setOwners((prev) => [newOwner, ...prev]);
+      setSaveStatus("saved");
+
+      setTimeout(() => {
+        setSaveStatus("idle");
+        setForm(EMPTY_FORM);
+        setErrors({});
+        setShowForm(false);
+      }, 800);
     } catch (err: any) {
       setSaveStatus("idle");
-      alert("Failed to create tenant: " + err.message);
-      return;
+      alert(err.message);
     }
-
-    // Create Supabase Auth user using signUp (works with anon key)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: {
-        data: {
-          role: "owner",
-          tenant_id: newTenant.id,
-        },
-      },
-    });
-
-    if (authError) {
-      // Clean up tenant if auth failed
-      try {
-        await deleteTenant(newTenant.id);
-      } catch (e) {
-        console.error("Failed to cleanup tenant after auth error:", e);
-      }
-      setSaveStatus("idle");
-      alert("Failed to create auth user: " + authError.message);
-      return;
-    }
-
-    // Create owner user in database linked to tenant
-    const authId = authData.user?.id;
-    if (authId) {
-      const { error: userError } = await supabase.from("users").insert({
-        auth_id: authId,
-        tenant_id: newTenant.id,
-        email: form.email,
-        full_name: form.shopName.trim(),
-        role: "owner",
-        is_active: true,
-      });
-
-      if (userError) {
-        console.error("Failed to create user record:", userError);
-        // Non-fatal error - auth user exists, they can still log in
-      }
-    }
-
-    // Add to local list for immediate feedback
-    const newOwner: OwnerAccount = {
-      id: newTenant.id,
-      name: form.shopName.trim(),
-      slug: form.slug || form.shopName.toLowerCase().replace(/\s+/g, "-"),
-      logo_url: form.logo_url,
-      owner_email: form.email,
-      created_at: new Date().toISOString(),
-    };
-
-    setOwners((prev) => [newOwner, ...prev]);
-    setSaveStatus("saved");
-
-    setTimeout(() => {
-      setSaveStatus("idle");
-      setForm(EMPTY_FORM);
-      setErrors({});
-      setShowForm(false);
-    }, 800);
   };
 
   const handleDelete = async (id: string, name: string) => {
