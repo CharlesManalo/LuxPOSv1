@@ -11,7 +11,7 @@ import type { UserRole } from "@/types";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login, error, isLoading } = useAuth();
+  const { login, error } = useAuth();
   const { setCurrentTenant } = useStore();
   const { showToast, ToastContainer } = useToast();
 
@@ -29,7 +29,7 @@ export function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting || isLoading) return;
+    if (isSubmitting) return;
 
     // Validate inputs
     if (!email.trim()) {
