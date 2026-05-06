@@ -90,19 +90,31 @@ export async function getUsers(
 }
 
 export async function getUserByAuthId(authId: string): Promise<AppUser | null> {
-  const { data, error } = await getSupabase()
-    .from("users")
-    .select("*")
-    .eq("auth_id", authId)
-    .eq("is_active", true)
-    .single();
+  try {
+    const { data, error } = await getSupabase()
+      .from("users")
+      .select("*")
+      .eq("auth_id", authId)
+      .eq("is_active", true)
+      .single();
 
-  if (error && error.code !== "PGRST116") {
-    console.error("getUserByAuthId error:", error);
+    if (error) {
+      if (error.code === "PGRST116") {
+        // No rows returned - user not found
+        console.log("User not found in database for auth_id:", authId);
+        return null;
+      } else {
+        // Other database errors
+        console.error("getUserByAuthId database error:", error);
+        throw error;
+      }
+    }
+    if (!data) return null;
+    return data as AppUser;
+  } catch (err) {
+    console.error("getUserByAuthId failed:", err);
     return null;
   }
-  if (!data) return null;
-  return data as AppUser;
 }
 
 export async function createUser(

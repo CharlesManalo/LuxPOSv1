@@ -20,12 +20,14 @@ function initializeAuth() {
         if (userData) {
           setUser(userData);
         } else {
+          console.warn("User not found in database, signing out");
           setUser(null);
           await supabase.auth.signOut();
         }
       } catch (err) {
         console.error("Auth state change error:", err);
         setUser(null);
+        // Don't sign out here to avoid infinite loops, just clear the user state
       }
     } else if (event === "SIGNED_OUT") {
       setUser(null);
@@ -34,6 +36,7 @@ function initializeAuth() {
 
   // Session check on mount with timeout safety
   const initTimeout = setTimeout(() => {
+    console.warn("Auth initialization timeout - forcing unblock");
     setLoading(false); // Force unblock if something hangs
   }, 5000);
 
@@ -44,13 +47,22 @@ function initializeAuth() {
         data: { session },
       } = await supabase.auth.getSession();
       if (session?.user) {
-        const userData = await getUserByAuthId(session.user.id);
-        if (userData) {
-          setUser(userData);
+        try {
+          const userData = await getUserByAuthId(session.user.id);
+          if (userData) {
+            setUser(userData);
+          } else {
+            console.warn("User not found in database during init");
+            setUser(null);
+          }
+        } catch (userErr) {
+          console.error("Failed to get user data during init:", userErr);
+          setUser(null);
         }
       }
     } catch (err) {
       console.error("Auth initialization error:", err);
+      setUser(null);
     } finally {
       clearTimeout(initTimeout);
       setLoading(false); // Always unblock
