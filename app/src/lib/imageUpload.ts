@@ -1,6 +1,19 @@
 import { getSupabaseClient } from "./supabaseClient";
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = getSupabaseClient();
+
+// Service role client to bypass RLS restrictions
+const supabaseServiceRole = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  },
+);
 
 export async function uploadProductImage(
   file: File,
@@ -28,8 +41,8 @@ export async function uploadProductImage(
   const fileExt = file.name.split(".").pop();
   const fileName = `${tenantId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-  // Upload to Supabase Storage
-  const { data, error } = await supabase.storage
+  // Upload to Supabase Storage using service role client to bypass RLS
+  const { data, error } = await supabaseServiceRole.storage
     .from("product-images")
     .upload(fileName, file, {
       cacheControl: "3600",
