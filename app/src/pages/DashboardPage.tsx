@@ -249,7 +249,7 @@ export function DashboardPage() {
 
       {/* Content */}
       <main className="px-4 sm:px-6 py-4 sm:py-6 max-w-full overflow-x-hidden">
-        {activeTab === "overview" && stats && <OverviewTab stats={stats} />}
+        {activeTab === "overview" && <OverviewTab stats={stats} />}
         {activeTab === "orders" && (
           <OrdersTab orders={orders} orderItems={orderItems} />
         )}
@@ -288,34 +288,45 @@ export function DashboardPage() {
 }
 
 // ─── Overview Tab ───
-function OverviewTab({ stats }: { stats: DashboardStats }) {
+function OverviewTab({ stats }: { stats: DashboardStats | null }) {
+  // Default empty stats if null
+  const s = stats || {
+    totalRevenue: 0,
+    totalOrders: 0,
+    totalProducts: 0,
+    lowStockCount: 0,
+    paymentBreakdown: [],
+    dailyRevenue: [],
+    topProducts: [],
+  };
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           title="Total Revenue"
-          value={`P${stats.totalRevenue.toLocaleString()}`}
+          value={`P${s.totalRevenue.toLocaleString()}`}
           icon={DollarSign}
           color="orange"
         />
         <KpiCard
           title="Total Orders"
-          value={stats.totalOrders.toString()}
+          value={s.totalOrders.toString()}
           icon={ShoppingBag}
           color="green"
         />
         <KpiCard
           title="Products"
-          value={stats.totalProducts.toString()}
+          value={s.totalProducts.toString()}
           icon={Utensils}
           color="blue"
         />
         <KpiCard
           title="Low Stock Items"
-          value={stats.lowStockCount.toString()}
+          value={s.lowStockCount.toString()}
           icon={AlertTriangle}
-          color={stats.lowStockCount > 0 ? "red" : "green"}
+          color={s.lowStockCount > 0 ? "red" : "green"}
         />
       </div>
 
@@ -326,9 +337,9 @@ function OverviewTab({ stats }: { stats: DashboardStats }) {
             Daily Revenue (14 days)
           </h3>
           <div className="flex items-end gap-0.5 sm:gap-1.5 h-32 sm:h-48 overflow-x-auto">
-            {stats.dailyRevenue.map((d, i) => {
+            {s.dailyRevenue.map((d, i) => {
               const maxVal = Math.max(
-                ...stats.dailyRevenue.map((dd) => dd.amount),
+                ...s.dailyRevenue.map((dd) => dd.amount),
                 1,
               );
               const height = (d.amount / maxVal) * 100;
@@ -360,7 +371,7 @@ function OverviewTab({ stats }: { stats: DashboardStats }) {
             Payment Methods
           </h3>
           <div className="space-y-2 sm:space-y-3">
-            {stats.paymentBreakdown.map((p) => (
+            {s.paymentBreakdown.map((p) => (
               <div key={p.method}>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-medium capitalize">{p.method}</span>
@@ -372,7 +383,7 @@ function OverviewTab({ stats }: { stats: DashboardStats }) {
                   <div
                     className="h-full rounded-full bg-accent-orange transition-all"
                     style={{
-                      width: `${stats.totalRevenue > 0 ? (p.amount / stats.totalRevenue) * 100 : 0}%`,
+                      width: `${s.totalRevenue > 0 ? (p.amount / s.totalRevenue) * 100 : 0}%`,
                     }}
                   />
                 </div>
@@ -388,7 +399,7 @@ function OverviewTab({ stats }: { stats: DashboardStats }) {
           Top Products
         </h3>
         <div className="space-y-2 sm:space-y-3">
-          {stats.topProducts.map((p, i) => (
+          {s.topProducts.map((p, i) => (
             <div key={i} className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-[#f5f5f5] flex items-center justify-center text-xs font-bold text-muted-foreground">
                 {i + 1}
