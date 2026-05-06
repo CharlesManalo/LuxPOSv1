@@ -20,11 +20,11 @@ serve(async (req) => {
     if (!authHeader) throw new Error("No authorization header");
 
     console.log("SUPABASE_URL:", Deno.env.get("SUPABASE_URL"));
-    console.log("SECRET_KEYS present:", !!Deno.env.get("SUPABASE_SECRET_KEYS"));
+    console.log("SERVICE_KEY present:", !!Deno.env.get("SERVICE_ROLE_KEY"));
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SECRET_KEYS")!,
+      Deno.env.get("SERVICE_ROLE_KEY")!,
     );
 
     // Verify caller is admin
