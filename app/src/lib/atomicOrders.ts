@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "./supabaseClient";
-const supabase = getSupabaseClient();
+
+const getSupabase = () => getSupabaseClient();
 import type { Order, OrderItem, Product, Ingredient } from "@/types";
 
 // Helper function to handle Supabase errors
@@ -142,7 +143,7 @@ export async function createOrderAtomic(
     }
 
     // Update stock
-    const { error: updateError } = await supabase
+    const { error: updateError } = await getSupabase()
       .from("ingredients")
       .update({ stock_qty: deduction.newStock })
       .eq("id", ingredientId);
@@ -153,14 +154,16 @@ export async function createOrderAtomic(
     }
 
     // Log inventory change
-    const { error: logError } = await supabase.from("inventory_logs").insert({
-      tenant_id: (order as any).tenant_id,
-      ingredient_id: ingredientId,
-      ingredient_name: deduction.name,
-      change_qty: deduction.change,
-      reason: "order",
-      triggered_by: (order as any).cashier_id,
-    });
+    const { error: logError } = await getSupabase()
+      .from("inventory_logs")
+      .insert({
+        tenant_id: (order as any).tenant_id,
+        ingredient_id: ingredientId,
+        ingredient_name: deduction.name,
+        change_qty: deduction.change,
+        reason: "order",
+        triggered_by: (order as any).cashier_id,
+      });
 
     if (logError) {
       console.error("Failed to log inventory change:", logError);
@@ -174,7 +177,7 @@ export async function createOrderAtomic(
   console.log("✅ Stock updates completed");
 
   // 6. CREATE THE ORDER
-  const { data: createdOrder, error: orderError } = await supabase
+  const { data: createdOrder, error: orderError } = await getSupabase()
     .from("orders")
     .insert(order as any)
     .select()
@@ -191,7 +194,7 @@ export async function createOrderAtomic(
     order_id: createdOrder.id,
   }));
 
-  const { error: itemsError } = await supabase
+  const { error: itemsError } = await getSupabase()
     .from("order_items")
     .insert(itemsWithOrderId as any);
 
@@ -243,7 +246,7 @@ export async function restoreIngredientStockOnVoid(
 
   // Update stock using any type bypass
   // @ts-nocheck
-  const updateResult = await (supabase as any)
+  const updateResult = await (getSupabase() as any)
     .from("ingredients")
     .update({ stock_qty: newStock })
     .eq("id", ingredientId);
@@ -253,14 +256,16 @@ export async function restoreIngredientStockOnVoid(
 
   // Log the change
   // @ts-ignore
-  const { error: logError } = await supabase.from("inventory_logs").insert({
-    tenant_id: tenantId,
-    ingredient_id: ingredientId,
-    ingredient_name: (ingredient as any).name,
-    change_qty: amount,
-    reason: amount > 0 ? "restock" : "adjustment",
-    triggered_by: userId,
-  });
+  const { error: logError } = await getSupabase()
+    .from("inventory_logs")
+    .insert({
+      tenant_id: tenantId,
+      ingredient_id: ingredientId,
+      ingredient_name: (ingredient as any).name,
+      change_qty: amount,
+      reason: amount > 0 ? "restock" : "adjustment",
+      triggered_by: userId,
+    });
 
   if (logError) handleSupabaseError(logError);
 
@@ -285,7 +290,7 @@ export async function voidOrderWithInventory(
   console.log(`🔄 Starting order void for ${orderId}`);
 
   // Get order details
-  const { data: order, error: orderError } = await supabase
+  const { data: order, error: orderError } = await getSupabase()
     .from("orders")
     .select("*")
     .eq("id", orderId)
@@ -295,7 +300,7 @@ export async function voidOrderWithInventory(
   if (!order) throw new Error("Order not found");
 
   // Get order items
-  const { data: orderItems, error: itemsError } = await supabase
+  const { data: orderItems, error: itemsError } = await getSupabase()
     .from("order_items")
     .select("*")
     .eq("order_id", orderId);
@@ -319,7 +324,7 @@ export async function voidOrderWithInventory(
       stockRestoration[req.ingredient_id].amount += restoreAmount;
 
       // Get ingredient name
-      const { data: ing } = await supabase
+      const { data: ing } = await getSupabase()
         .from("ingredients")
         .select("name")
         .eq("id", req.ingredient_id)
@@ -344,7 +349,7 @@ export async function voidOrderWithInventory(
 
   // Update order status using any type bypass
   // @ts-nocheck
-  const updateResult = await (supabase as any)
+  const updateResult = await (getSupabase() as any)
     .from("orders")
     .update({ status: "voided" })
     .eq("id", orderId);

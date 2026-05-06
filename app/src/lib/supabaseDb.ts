@@ -1,5 +1,7 @@
 import { getSupabaseClient } from "./supabaseClient";
-const supabase = getSupabaseClient();
+
+// Lazy getter to ensure single client instance
+const getSupabase = () => getSupabaseClient();
 import type {
   Tenant,
   AppUser,
@@ -23,7 +25,7 @@ function handleSupabaseError(error: any): never {
 // --- TENANT OPERATIONS ---
 
 export async function getTenants(): Promise<any[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("tenants")
     .select("*")
     .order("created_at", { ascending: false });
@@ -33,7 +35,7 @@ export async function getTenants(): Promise<any[]> {
 }
 
 export async function getTenant(tenantId: string): Promise<Tenant | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("tenants")
     .select("*")
     .eq("id", tenantId)
@@ -49,7 +51,7 @@ export async function createTenant(tenantData: {
   receipt_printing_enabled: boolean;
   receipt_config: Tenant["receipt_config"];
 }): Promise<Tenant> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("tenants")
     .insert(tenantData as any)
     .select()
@@ -66,7 +68,7 @@ export async function getUsers(
   tenantId: string,
   role?: UserRole,
 ): Promise<AppUser[]> {
-  let query = supabase.from("users").select("*").eq("tenant_id", tenantId);
+  let query = getSupabase().from("users").select("*").eq("tenant_id", tenantId);
 
   if (role) {
     query = query.eq("role", role);
@@ -79,7 +81,7 @@ export async function getUsers(
 }
 
 export async function getUserByAuthId(authId: string): Promise<AppUser | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("users")
     .select("*")
     .eq("auth_id", authId)
@@ -97,7 +99,7 @@ export async function getUserByAuthId(authId: string): Promise<AppUser | null> {
 export async function createUser(
   user: Omit<AppUser, "id" | "created_at">,
 ): Promise<AppUser> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("users")
     .insert(user as any)
     .select()
@@ -112,7 +114,7 @@ export async function updateUser(
   userId: string,
   updates: Partial<Omit<AppUser, "id" | "created_at">>,
 ): Promise<AppUser> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("users")
     .update(updates as any)
     .eq("id", userId)
@@ -125,14 +127,14 @@ export async function updateUser(
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  const { error } = await supabase.from("users").delete().eq("id", userId);
+  const { error } = await getSupabase().from("users").delete().eq("id", userId);
   if (error) handleSupabaseError(error);
 }
 
 // --- CATEGORY OPERATIONS ---
 
 export async function getCategories(tenantId: string): Promise<Category[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("categories")
     .select("*")
     .eq("tenant_id", tenantId)
@@ -146,7 +148,7 @@ export async function createCategory(
   category: Omit<Category, "id" | "created_at">,
 ): Promise<Category> {
   // @ts-ignore
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("categories")
     .insert(category as any)
     .select()
@@ -160,7 +162,7 @@ export async function createCategory(
 // --- INGREDIENT OPERATIONS ---
 
 export async function getIngredients(tenantId: string): Promise<Ingredient[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("ingredients")
     .select("*")
     .eq("tenant_id", tenantId)
@@ -174,7 +176,7 @@ export async function createIngredient(
   ingredient: Omit<Ingredient, "id" | "created_at">,
 ): Promise<Ingredient> {
   // @ts-ignore
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("ingredients")
     .insert(ingredient as any)
     .select()
@@ -186,7 +188,7 @@ export async function createIngredient(
 }
 
 export async function deleteIngredient(ingredientId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from("ingredients")
     .delete()
     .eq("id", ingredientId);
@@ -199,7 +201,7 @@ export async function restockIngredient(
   qty: number,
   userId: string,
 ): Promise<void> {
-  const { data: ingredient, error: fetchError } = await supabase
+  const { data: ingredient, error: fetchError } = await getSupabase()
     .from("ingredients")
     .select("*")
     .eq("id", ingredientId)
@@ -211,7 +213,7 @@ export async function restockIngredient(
   const newStock = (ingredient as any).stock_qty + qty;
 
   // @ts-ignore
-  const { error: updateError } = await supabase
+  const { error: updateError } = await getSupabase()
     .from("ingredients")
     .update({ stock_qty: newStock } as any)
     .eq("id", ingredientId);
@@ -219,14 +221,16 @@ export async function restockIngredient(
   if (updateError) handleSupabaseError(updateError);
 
   // @ts-ignore
-  const { error: logError } = await supabase.from("inventory_logs").insert({
-    tenant_id: (ingredient as any).tenant_id,
-    ingredient_id: ingredientId,
-    ingredient_name: (ingredient as any).name,
-    change_qty: qty,
-    reason: qty > 0 ? "restock" : "order",
-    triggered_by: userId,
-  } as any);
+  const { error: logError } = await getSupabase()
+    .from("inventory_logs")
+    .insert({
+      tenant_id: (ingredient as any).tenant_id,
+      ingredient_id: ingredientId,
+      ingredient_name: (ingredient as any).name,
+      change_qty: qty,
+      reason: qty > 0 ? "restock" : "order",
+      triggered_by: userId,
+    } as any);
 
   if (logError) handleSupabaseError(logError);
 }
@@ -234,7 +238,7 @@ export async function restockIngredient(
 // --- PRODUCT OPERATIONS ---
 
 export async function getProducts(tenantId: string): Promise<Product[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .select(
       `
@@ -265,7 +269,7 @@ export async function createProduct(
   const { recipe, variants, ...productData } = product as any;
 
   // @ts-ignore
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .insert(productData as any)
     .select()
@@ -281,7 +285,7 @@ export async function createProduct(
       qty_required: item.qty_required,
     }));
     // @ts-ignore
-    const { error: iErr } = await supabase
+    const { error: iErr } = await getSupabase()
       .from("product_ingredients")
       .insert(productIngredients as any);
     if (iErr) handleSupabaseError(iErr);
@@ -293,7 +297,7 @@ export async function createProduct(
       product_id: data.id,
     }));
     // @ts-ignore
-    const { error: vErr } = await supabase
+    const { error: vErr } = await getSupabase()
       .from("product_variants")
       .insert(productVariants as any);
     if (vErr) handleSupabaseError(vErr);
@@ -312,7 +316,7 @@ export async function updateProduct(
   const { recipe, variants, ...productData } = updates;
 
   // @ts-ignore
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("products")
     .update(productData as any)
     .eq("id", productId)
@@ -323,7 +327,7 @@ export async function updateProduct(
   if (!data) throw new Error("Product not found");
 
   if (recipe !== undefined) {
-    await supabase
+    await getSupabase()
       .from("product_ingredients")
       .delete()
       .eq("product_id", productId);
@@ -334,7 +338,7 @@ export async function updateProduct(
         qty_required: item.qty_required,
       }));
       // @ts-ignore
-      const { error: iErr } = await supabase
+      const { error: iErr } = await getSupabase()
         .from("product_ingredients")
         .insert(productIngredients as any);
       if (iErr) handleSupabaseError(iErr);
@@ -345,7 +349,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(productId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from("products")
     .delete()
     .eq("id", productId);
@@ -355,7 +359,7 @@ export async function deleteProduct(productId: string): Promise<void> {
 export async function getProductVariants(
   productId: string,
 ): Promise<ProductVariant[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("product_variants")
     .select("*")
     .eq("product_id", productId)
@@ -371,7 +375,7 @@ export async function getOrders(
   tenantId: string,
   limit?: number,
 ): Promise<Order[]> {
-  let query = supabase
+  let query = getSupabase()
     .from("orders")
     .select("*")
     .eq("tenant_id", tenantId)
@@ -385,7 +389,7 @@ export async function getOrders(
 }
 
 export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("order_items")
     .select("*")
     .eq("order_id", orderId)
@@ -400,7 +404,7 @@ export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
 export async function getNotifications(
   tenantId: string,
 ): Promise<Notification[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("notifications")
     .select("*")
     .eq("tenant_id", tenantId)
@@ -415,7 +419,7 @@ export async function updateNotificationStatus(
   status: "approved" | "rejected",
 ): Promise<void> {
   // @ts-ignore
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from("notifications")
     .update({ status } as any)
     .eq("id", notificationId);
@@ -426,7 +430,7 @@ export async function updateNotificationStatus(
 // --- AUTH & PROFILE ---
 
 export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await getSupabase().auth.signInWithPassword({
     email,
     password,
   });
@@ -435,11 +439,11 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
-  await supabase.auth.signOut();
+  await getSupabase().auth.signOut();
 }
 
 export async function getUserProfile(userId: string): Promise<any> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("user_profiles")
     .select("*")
     .eq("user_id", userId)
@@ -454,7 +458,7 @@ export async function updateUserProfile(
   updates: Partial<any>,
 ): Promise<any> {
   // @ts-ignore
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("user_profiles")
     .update(updates)
     .eq("user_id", userId)
