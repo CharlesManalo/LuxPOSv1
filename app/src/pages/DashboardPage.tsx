@@ -40,11 +40,8 @@ import {
   restockIngredient,
   getOrders,
   getOrderItems,
-  getUsers,
-  createUser,
-  updateUser,
-  deleteUser,
 } from "@/lib/mockDb";
+import { createUser, getUsers, updateUser, deleteUser } from "@/lib/supabaseDb";
 import { uploadProductImage } from "@/lib/imageUpload";
 import type {
   Notification,

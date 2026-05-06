@@ -131,9 +131,20 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("Edge function error:", err);
+    console.error("Error stack:", err.stack);
+    return new Response(
+      JSON.stringify({
+        error: err.message,
+        details: {
+          name: err.name,
+          stack: err.stack,
+        },
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });
