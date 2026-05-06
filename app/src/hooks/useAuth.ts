@@ -55,7 +55,7 @@ function initializeAuth() {
 }
 
 export function useAuth() {
-  const { currentUser, setUser, setLoading, isLoading } = useStore();
+  const { currentUser, setLoading, isLoading } = useStore();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
