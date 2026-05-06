@@ -1,32 +1,39 @@
-import { supabase } from './supabase';
+import { getSupabaseClient } from "./supabaseClient";
 
-export async function uploadProductImage(file: File, tenantId: string): Promise<string> {
+const supabase = getSupabaseClient();
+
+export async function uploadProductImage(
+  file: File,
+  tenantId: string,
+): Promise<string> {
   if (!file) {
-    throw new Error('No file provided');
+    throw new Error("No file provided");
   }
 
   // Validate file type
-  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
   if (!allowedTypes.includes(file.type)) {
-    throw new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.');
+    throw new Error(
+      "Invalid file type. Only JPEG, PNG, and WebP images are allowed.",
+    );
   }
 
   // Validate file size (max 5MB)
   const maxSize = 5 * 1024 * 1024; // 5MB
   if (file.size > maxSize) {
-    throw new Error('File size too large. Maximum size is 5MB.');
+    throw new Error("File size too large. Maximum size is 5MB.");
   }
 
   // Generate unique file name
-  const fileExt = file.name.split('.').pop();
+  const fileExt = file.name.split(".").pop();
   const fileName = `${tenantId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
   // Upload to Supabase Storage
   const { data, error } = await supabase.storage
-    .from('product-images')
+    .from("product-images")
     .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: false
+      cacheControl: "3600",
+      upsert: false,
     });
 
   if (error) {
@@ -34,9 +41,9 @@ export async function uploadProductImage(file: File, tenantId: string): Promise<
   }
 
   // Get public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from('product-images')
-    .getPublicUrl(data.path);
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("product-images").getPublicUrl(data.path);
 
   return publicUrl;
 }
@@ -46,38 +53,38 @@ export async function deleteProductImage(imageUrl: string): Promise<void> {
     // Extract file path from URL
     const url = new URL(imageUrl);
     const pathMatch = url.pathname.match(/\/product-images\/(.+)/);
-    
+
     if (!pathMatch) {
-      console.warn('Could not extract file path from URL');
+      console.warn("Could not extract file path from URL");
       return;
     }
 
     const filePath = pathMatch[1];
-    
+
     const { error } = await supabase.storage
-      .from('product-images')
+      .from("product-images")
       .remove([filePath]);
 
     if (error) {
-      console.warn('Failed to delete image:', error.message);
+      console.warn("Failed to delete image:", error.message);
     }
   } catch (error) {
-    console.warn('Error deleting image:', error);
+    console.warn("Error deleting image:", error);
   }
 }
 
 export function getImageUrl(imagePath: string): string {
-  if (!imagePath) return '';
-  
+  if (!imagePath) return "";
+
   // If it's already a full URL, return as is
-  if (imagePath.startsWith('http')) {
+  if (imagePath.startsWith("http")) {
     return imagePath;
   }
 
   // Otherwise, get public URL from Supabase
-  const { data: { publicUrl } } = supabase.storage
-    .from('product-images')
-    .getPublicUrl(imagePath);
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("product-images").getPublicUrl(imagePath);
 
   return publicUrl;
 }
