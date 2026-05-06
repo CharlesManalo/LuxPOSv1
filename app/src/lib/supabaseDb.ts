@@ -249,19 +249,20 @@ export async function getDashboardStats(
 
   // Calculate stats
   const totalRevenue =
-    orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+    orders?.reduce((sum: number, order: any) => sum + (order.total || 0), 0) ||
+    0;
   const totalOrders = orders?.length || 0;
   const totalProducts = productsCount || 0;
 
   // Calculate low stock count
   const lowStockCount =
     ingredients?.filter(
-      (i) => i.stock_qty > 0 && i.stock_qty <= i.low_stock_threshold,
+      (i: any) => i.stock_qty > 0 && i.stock_qty <= i.low_stock_threshold,
     ).length || 0;
 
   // Calculate payment breakdown
   const paymentMap = new Map<string, { amount: number; count: number }>();
-  orders?.forEach((order) => {
+  orders?.forEach((order: any) => {
     const method = order.payment_method || "cash";
     const current = paymentMap.get(method) || { amount: 0, count: 0 };
     paymentMap.set(method, {
@@ -287,7 +288,7 @@ export async function getDashboardStats(
     dailyRevenueMap.set(dateStr, 0);
   }
 
-  orders?.forEach((order) => {
+  orders?.forEach((order: any) => {
     const dateStr = order.created_at?.split("T")[0];
     if (dateStr && dailyRevenueMap.has(dateStr)) {
       const current = dailyRevenueMap.get(dateStr) || 0;
