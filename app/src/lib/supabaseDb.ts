@@ -167,42 +167,38 @@ export async function createCashier(cashierData: {
 }): Promise<AppUser> {
   const { tenant_id, full_name, email, password = "cashier123" } = cashierData;
 
-  // First create the auth user
-  const { data: authData, error: authError } =
-    await getSupabase().auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
+  const supabase = getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (authError) {
-    console.error("Failed to create auth user for cashier:", authError);
-    throw new Error(`Failed to create auth user: ${authError.message}`);
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashier`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          tenant_id,
+          full_name,
+          email,
+          password,
+        }),
+      },
+    );
+
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Failed to create cashier");
+
+    return result.user as AppUser;
+  } catch (err: any) {
+    console.error("Failed to create cashier:", err);
+    throw new Error(err.message || "Failed to create cashier");
   }
-
-  // Then create the user record in the database
-  const { data, error } = await getSupabase()
-    .from("users")
-    .insert({
-      auth_id: authData.user.id,
-      tenant_id,
-      email,
-      full_name,
-      role: "cashier",
-      is_active: true,
-    } as any)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Failed to create cashier record:", error);
-    // Try to clean up the auth user if database insert fails
-    await getSupabase().auth.admin.deleteUser(authData.user.id);
-    handleSupabaseError(error);
-  }
-
-  if (!data) throw new Error("Failed to create cashier");
-  return data as AppUser;
 }
 
 export async function deleteCashier(cashierId: string): Promise<void> {
