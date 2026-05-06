@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router";
 import { useNavigate } from "react-router";
-import { Shield } from "lucide-react";
+import { Shield, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { LoginPage } from "@/pages/LoginPage";
 import { AdminPage } from "@/pages/AdminPage";
@@ -26,6 +26,37 @@ function AdminButton({ currentUser }: { currentUser: AppUser | null }) {
       title="Admin Panel"
     >
       <Shield className="w-6 h-6 text-white" />
+    </button>
+  );
+}
+
+function RefreshButton() {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+
+    // Clear all LuxPOS and Supabase related localStorage items
+    Object.keys(localStorage)
+      .filter((k) => k.includes("luxpos") || k.includes("sb-"))
+      .forEach((k) => localStorage.removeItem(k));
+
+    // Force page reload
+    setTimeout(() => {
+      location.reload();
+    }, 500);
+  };
+
+  return (
+    <button
+      onClick={handleRefresh}
+      className="fixed top-4 right-4 z-50 w-12 h-12 rounded-full bg-[#ff9e2c] flex items-center justify-center hover:bg-[#ff8800] transition-all shadow-lg hover:shadow-xl md:w-14 md:h-14"
+      title="Force Refresh"
+      disabled={isRefreshing}
+    >
+      <RefreshCw
+        className={`w-5 h-5 text-white md:w-6 md:h-6 ${isRefreshing ? "animate-spin" : ""}`}
+      />
     </button>
   );
 }
@@ -58,6 +89,7 @@ function App() {
   return (
     <>
       <AdminButton currentUser={currentUser} />
+      <RefreshButton />
       <Routes>
         <Route
           path="/login"

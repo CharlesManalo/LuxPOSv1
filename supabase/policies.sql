@@ -38,22 +38,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Helper function to get current user's tenant_id
+CREATE OR REPLACE FUNCTION is_owner()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.users
+        WHERE auth_id = auth.uid()
+        AND role::text = 'owner'
+        AND is_active = true
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE OR REPLACE FUNCTION current_user_tenant_id()
 RETURNS UUID AS $$
 BEGIN
-    IF auth.uid() IS NULL THEN
-        RETURN NULL;
-    END IF;
-
-    RETURN (
-        SELECT tenant_id FROM users 
-        WHERE auth_id = auth.uid() 
-        AND is_active = true
-        LIMIT 1
-    );
+  IF auth.uid() IS NULL THEN
+    RETURN NULL;
+  END IF;
+  RETURN (
+    SELECT tenant_id FROM public.users
+    WHERE auth_id = auth.uid()
+    AND is_active = true
+    LIMIT 1
+  );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Helper function to check if user belongs to tenant
 CREATE OR REPLACE FUNCTION user_belongs_to_tenant(tenant_uuid UUID)
@@ -96,6 +105,14 @@ CREATE POLICY "Users can view own record" ON users
 CREATE POLICY "Admins can create users" ON users
     FOR INSERT WITH CHECK (role::text IN ('admin', 'super_admin'));
 
+-- Owners can create cashiers
+CREATE POLICY "Owners can create cashiers" ON users
+    FOR INSERT WITH CHECK (
+        role::text = 'cashier'
+        AND tenant_id = current_user_tenant_id()
+        AND is_owner()
+    );
+
 -- Users can update their own profile
 CREATE POLICY "Users can update own profile" ON users
     FOR UPDATE USING (
@@ -106,6 +123,8 @@ CREATE POLICY "Users can update own profile" ON users
 -- Only admins can delete users
 CREATE POLICY "Admins can delete users" ON users
     FOR DELETE USING (role::text IN ('admin', 'super_admin'));
+
+-- Duplicate policy removed
 
 -- CATEGORIES POLICIES
 CREATE POLICY "Users can view categories in their tenant" ON categories

@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Create Test Accounts</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
+  <body>
+    <h1>Creating Test Accounts...</h1>
+    <div id="status"></div>
+
+    <script>
+      const { createClient } = supabase;
+      const supabaseUrl = "https://cnycpwqkxytzinejlhkk.supabase.co";
+      const supabaseAnonKey =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNueWNwd3FreHl0emluZWpsaGtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MDgyNDcsImV4cCI6MjA5MjE4NDI0N30.GfWWeIHEmmwT38FWJ-u8bTmSskkZb7xEWBs_aRaFgak";
+      const client = createClient(supabaseUrl, supabaseAnonKey);
+
+      async function createAccounts() {
+        const status = document.getElementById("status");
+        status.innerHTML = "Creating accounts...";
+
+        try {
+          // Create admin account
+          const { data: adminData, error: adminError } =
+            await client.auth.signUp({
+              email: "test@gmail.com",
+              password: "123456",
+              options: {
+                emailRedirectTo: undefined,
+                data: {},
+              },
+            });
+
+          if (adminError) {
+            status.innerHTML += "<br>Admin error: " + adminError.message;
+          } else {
+            status.innerHTML += "<br>✅ Admin account created";
+          }
+
+          // Create owner accounts
+          const owners = [
+            { email: "testing@gmail.com", name: "Testing Owner" },
+            { email: "owner2@gmail.com", name: "Owner 2" },
+          ];
+
+          for (const owner of owners) {
+            const { error } = await client.auth.signUp({
+              email: owner.email,
+              password: "123456",
+              options: {
+                emailRedirectTo: undefined,
+                data: {},
+              },
+            });
+
+            if (error) {
+              status.innerHTML +=
+                "<br>❌ " + owner.email + " error: " + error.message;
+            } else {
+              status.innerHTML += "<br>✅ " + owner.email + " created";
+            }
+          }
+
+          // Create cashier accounts
+          const cashiers = [
+            "owner1-cashier1@gmail.com",
+            "owner1-cashier2@gmail.com",
+            "owner2-cashier1@gmail.com",
+            "owner2-cashier2@gmail.com",
+          ];
+
+          for (const email of cashiers) {
+            const { error } = await client.auth.signUp({
+              email: email,
+              password: "123456",
+              options: {
+                emailRedirectTo: undefined,
+                data: {},
+              },
+            });
+
+            if (error) {
+              status.innerHTML +=
+                "<br>❌ " + email + " error: " + error.message;
+            } else {
+              status.innerHTML += "<br>✅ " + email + " created";
+            }
+          }
+          status.innerHTML +=
+            "<br><br><strong>All accounts created! You can now try logging in.</strong>";
+        } catch (err) {
+          status.innerHTML += "<br>Error: " + err.message;
+        }
+      }
+
+      // Auto-run when page loads
+      createAccounts();
+    </script>
+  </body>
+</html>
