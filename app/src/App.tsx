@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router";
 import { useNavigate } from "react-router";
 import { Shield } from "lucide-react";
+import { useState, useEffect } from "react";
 import { LoginPage } from "@/pages/LoginPage";
 import { AdminPage } from "@/pages/AdminPage";
 import { CashierPage } from "@/pages/CashierPage";
@@ -31,8 +32,14 @@ function AdminButton({ currentUser }: { currentUser: AppUser | null }) {
 
 function App() {
   const { isAuthenticated, currentUser, isLoading } = useAuth();
+  const [forceReady, setForceReady] = useState(false);
 
-  if (isLoading) {
+  useEffect(() => {
+    const timer = setTimeout(() => setForceReady(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading && !forceReady) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
