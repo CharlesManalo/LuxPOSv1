@@ -62,11 +62,30 @@ export function useAuth() {
     initializeAuth();
   }, []);
 
+  // Hardcoded admin for development
+  const ADMIN_EMAIL = "charlesaustinmanalo@gmail.com";
+  const ADMIN_PASSWORD = "admin123@lux";
+
   const login = useCallback(
     async (email: string, password: string) => {
       setError(null);
       setLoading(true);
       try {
+        // Hardcoded admin bypass
+        if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+          const { setUser } = useStore.getState();
+          setUser({
+            id: "admin-001",
+            tenant_id: "admin-tenant",
+            email: ADMIN_EMAIL,
+            full_name: "Admin User",
+            role: "super_admin",
+            avatar_url: null,
+            created_at: new Date().toISOString(),
+          });
+          return true;
+        }
+
         const supabase = getSupabaseClient();
         const { data, error: authError } =
           await supabase.auth.signInWithPassword({
