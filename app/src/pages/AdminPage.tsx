@@ -208,45 +208,71 @@ function OwnerAccountsPanel() {
     if (!validate()) return;
     setSaveStatus("saving");
 
-    // Create Supabase Auth user first
     const supabase = getSupabaseClient();
-    const { data: authData, error: authError } =
-      await supabase.auth.admin.createUser({
-        email: form.email,
-        password: form.password,
-        email_confirm: true,
+
+    // Create tenant in database first (no auth needed for this)
+    let newTenant;
+    try {
+      newTenant = await createTenant({
+        name: form.shopName.trim(),
+        slug: form.slug || form.shopName.toLowerCase().replace(/\s+/g, "-"),
+        receipt_printing_enabled: true,
+        receipt_config: {
+          header_text: form.shopName.trim(),
+          address: "",
+          contact_number: "",
+          footer_message: "Thank you!",
+          paper_width: "80mm",
+          show_cashier_name: true,
+        },
       });
+    } catch (err: any) {
+      setSaveStatus("idle");
+      alert("Failed to create tenant: " + err.message);
+      return;
+    }
+
+    // Create Supabase Auth user using signUp (works with anon key)
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: {
+        data: {
+          role: "owner",
+          tenant_id: newTenant.id,
+        },
+      },
+    });
 
     if (authError) {
+      // Clean up tenant if auth failed
+      try {
+        await deleteTenant(newTenant.id);
+      } catch (e) {
+        console.error("Failed to cleanup tenant after auth error:", e);
+      }
       setSaveStatus("idle");
       alert("Failed to create auth user: " + authError.message);
       return;
     }
 
-    // Create tenant in database
-    const newTenant = await createTenant({
-      name: form.shopName.trim(),
-      slug: form.slug || form.shopName.toLowerCase().replace(/\s+/g, "-"),
-      receipt_printing_enabled: true,
-      receipt_config: {
-        header_text: form.shopName.trim(),
-        address: "",
-        contact_number: "",
-        footer_message: "Thank you!",
-        paper_width: "80mm",
-        show_cashier_name: true,
-      },
-    });
-
     // Create owner user in database linked to tenant
-    await supabase.from("users").insert({
-      auth_id: authData.user.id,
-      tenant_id: newTenant.id,
-      email: form.email,
-      full_name: form.shopName.trim(),
-      role: "owner",
-      is_active: true,
-    });
+    const authId = authData.user?.id;
+    if (authId) {
+      const { error: userError } = await supabase.from("users").insert({
+        auth_id: authId,
+        tenant_id: newTenant.id,
+        email: form.email,
+        full_name: form.shopName.trim(),
+        role: "owner",
+        is_active: true,
+      });
+
+      if (userError) {
+        console.error("Failed to create user record:", userError);
+        // Non-fatal error - auth user exists, they can still log in
+      }
+    }
 
     // Add to local list for immediate feedback
     const newOwner: OwnerAccount = {
