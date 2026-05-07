@@ -2,7 +2,8 @@
 -- Run this in Supabase SQL editor to fix all table schema problems
 
 -- Fix order_items table schema cache
-DO $$
+DO
+$$
 BEGIN
     -- Add product_name column if missing
     IF NOT EXISTS (
@@ -68,7 +69,8 @@ BEGIN
         ALTER TABLE order_items ADD COLUMN order_id UUID REFERENCES orders(id) ON DELETE CASCADE;
         RAISE NOTICE 'Added order_id column to order_items';
     END IF;
-END $$;
+END;
+$$;
 
 -- Verify all columns exist
 SELECT 
