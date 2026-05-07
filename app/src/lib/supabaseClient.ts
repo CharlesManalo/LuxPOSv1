@@ -29,8 +29,7 @@ export function getSupabaseClient() {
       storageKey: "luxpos-auth-token", // prevents lock conflicts
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
-      flowType: "pkce",
+      detectSessionInUrl: false, // no OAuth redirects to parse
     },
   });
 
