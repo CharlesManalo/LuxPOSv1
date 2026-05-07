@@ -193,7 +193,7 @@ export async function createOrderAtomic(
     product_id: item.product_id,
     variant_name: item.variant_name || null,
     quantity: item.qty || 1,
-    unit_price: item.unit_price,
+    total_price: item.unit_price || 0,
     order_id: createdOrder.id,
   }));
 
