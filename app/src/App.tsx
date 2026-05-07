@@ -50,12 +50,12 @@ function RefreshButton() {
   return (
     <button
       onClick={handleRefresh}
-      className="fixed top-4 right-4 z-50 w-12 h-12 rounded-full bg-[#ff9e2c] flex items-center justify-center hover:bg-[#ff8800] transition-all shadow-lg hover:shadow-xl md:w-14 md:h-14"
+      className="fixed bottom-4 left-4 z-50 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#ff9e2c] flex items-center justify-center hover:bg-[#ff8800] transition-all shadow-lg hover:shadow-xl md:w-14 md:h-14"
       title="Force Refresh"
       disabled={isRefreshing}
     >
       <RefreshCw
-        className={`w-5 h-5 text-white md:w-6 md:h-6 ${isRefreshing ? "animate-spin" : ""}`}
+        className={`w-4 h-4 text-white sm:w-5 sm:h-5 md:w-6 md:h-6 ${isRefreshing ? "animate-spin" : ""}`}
       />
     </button>
   );
