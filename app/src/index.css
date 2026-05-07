@@ -124,17 +124,14 @@
 }
 
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  #receipt-print-area,
-  #receipt-print-area * {
-    visibility: visible;
+  body > * {
+    display: none !important;
   }
   #receipt-print-area {
-    position: absolute;
-    left: 0;
+    display: block !important;
+    position: fixed;
     top: 0;
+    left: 0;
     width: 100%;
   }
 }

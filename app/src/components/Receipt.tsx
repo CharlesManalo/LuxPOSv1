@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CartItem, ReceiptConfig } from "@/types";
@@ -22,57 +21,12 @@ export function Receipt({
   receiptConfig,
   onPrint,
 }: ReceiptProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
-
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
 
   const handlePrint = () => {
     window.print();
     onPrint?.();
   };
-
-  useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.innerHTML = "";
-      const fullText = contentRef.current.dataset.text || "";
-      let idx = -1;
-      let speed = 100;
-      const easing = 0.1;
-      let timer: ReturnType<typeof setInterval>;
-
-      const tick = () => {
-        if (!contentRef.current) return;
-        if (idx < fullText.length - 1) {
-          idx++;
-        } else {
-          clearInterval(timer);
-          return;
-        }
-        contentRef.current.innerHTML += fullText.charAt(idx);
-        speed = Math.max(30, 100 * (easing * (1 - idx / fullText.length)));
-        clearInterval(timer);
-        timer = setInterval(tick, speed);
-      };
-
-      timer = setInterval(tick, speed);
-      return () => clearInterval(timer);
-    }
-  }, []);
-
-  const receiptText = `${receiptConfig.header_text}
-${receiptConfig.address}
-Contact: ${receiptConfig.contact_number}
-${"-".repeat(32)}
-Order #: ${orderNumber}
-Date: ${date}
-${receiptConfig.show_cashier_name ? `Cashier: ${cashierName}` : ""}
-Payment: ${paymentMethod.toUpperCase()}
-${"-".repeat(32)}
-${items.map((item) => `${item.product_name}${item.variant_name ? ` (${item.variant_name})` : ""}`.padEnd(20) + `${item.qty}x`.padStart(4) + `P${(item.price * item.qty).toFixed(2)}`.padStart(8)).join("\n")}
-${"-".repeat(32)}
-${"TOTAL:".padEnd(24)}P${total.toFixed(2).padStart(8)}
-${"=".repeat(32)}
-${receiptConfig.footer_message}`;
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -81,12 +35,6 @@ ${receiptConfig.footer_message}`;
         className="w-full max-w-[300px] bg-white p-6 font-mono text-xs text-[#2c2c2c] print:shadow-none"
         style={{ fontFamily: "'Inter', monospace" }}
       >
-        <div
-          ref={contentRef}
-          data-text={receiptText}
-          className="whitespace-pre-wrap"
-          style={{ display: "none" }}
-        />
         {/* Visible receipt content */}
         <div className="receipt-content whitespace-pre-wrap">
           <h1
