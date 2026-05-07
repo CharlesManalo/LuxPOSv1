@@ -173,6 +173,42 @@ export function useAuth() {
     }
   }, []);
 
+  // Add Supabase connection test for debugging
+  const testSupabaseConnection = useCallback(async () => {
+    try {
+      console.log("🔍 Testing Supabase connection on:", window.location.origin);
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        console.log("✅ Supabase client available");
+
+        // Test basic database connection
+        const { data, error } = await supabase
+          .from("tenants")
+          .select("id, name")
+          .limit(1);
+        console.log(
+          "Database test:",
+          error ? `❌ ${error.message}` : "✅ Connected",
+        );
+
+        if (data && data.length > 0) {
+          console.log("Sample data:", data[0]);
+        }
+      } else {
+        console.log("❌ Supabase client not available");
+        console.log("Environment check:", {
+          url: import.meta.env.VITE_SUPABASE_URL,
+          hasKey: !!import.meta.env.VITE_SUPABASE_ANON_KEY,
+          availableVars: Object.keys(import.meta.env).filter((k) =>
+            k.includes("SUPABASE"),
+          ),
+        });
+      }
+    } catch (err) {
+      console.error("❌ Supabase connection test failed:", err);
+    }
+  }, []);
+
   return {
     currentUser,
     isLoading,
@@ -180,5 +216,6 @@ export function useAuth() {
     login,
     logout,
     isAuthenticated: !!currentUser,
+    testSupabaseConnection,
   };
 }
