@@ -240,7 +240,7 @@ export function CashierPage() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /** Single, unified order-creation function — eliminates the double-call bug */
-  const submitOrder = async (received: number, change: number) => {
+  const submitOrder = async (_received: number, change: number) => {
     if (!currentUser) return;
     setOrderCreating(true);
     try {
