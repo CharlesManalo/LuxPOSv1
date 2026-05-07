@@ -187,7 +187,11 @@ export function CashierPage() {
 
   // ── Product click ──
   const handleProductClick = async (product: Product) => {
-    if (!canAddToCart(product, ingredients, 1)) return;
+    if (!canAddToCart(product, ingredients, 1)) {
+      console.log("❌ Cannot add product to cart:", product.name);
+      showToast("Cannot add product to cart", "warning");
+      return;
+    }
 
     if (!product.has_variants) {
       addToCart({
