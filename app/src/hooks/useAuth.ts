@@ -124,7 +124,7 @@ function initializeAuth() {
         console.error(
           `❌   Add '${window.location.origin}' to Site URL and Redirect URLs`,
         );
-        console.error("❌   Also add pattern: '${window.location.origin}/**'");
+        console.error(`❌   Also add pattern: '${window.location.origin}/**'`);
       } else if (!err?.message?.includes("Lock")) {
         console.error("Auth initialization error:", err);
       }
