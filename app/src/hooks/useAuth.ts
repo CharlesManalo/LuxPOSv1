@@ -47,7 +47,7 @@ function initializeAuth() {
     // Check if Supabase client is working
     try {
       console.log("🔧 Testing Supabase client...");
-      const testClient = getSupabaseClient();
+      getSupabaseClient();
       console.log("✅ Supabase client created successfully");
     } catch (clientErr) {
       console.error("❌ Supabase client creation failed:", clientErr);
