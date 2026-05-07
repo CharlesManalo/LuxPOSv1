@@ -191,8 +191,8 @@ export async function createOrderAtomic(
   // 7. CREATE ORDER ITEMS
   const itemsWithOrderId = orderItems.map((item) => ({
     product_id: item.product_id,
-    variant_name: item.variant_name,
-    quantity: item.qty,
+    variant_name: item.variant_name || null,
+    quantity: item.qty || 1,
     unit_price: item.unit_price,
     order_id: createdOrder.id,
   }));
