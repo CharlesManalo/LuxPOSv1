@@ -107,6 +107,7 @@ function App() {
             <ProtectedRoute
               allowedRoles={["admin", "owner"]}
               userRole={currentUser?.role}
+              isLoading={isLoading}
             >
               <AdminPage />
             </ProtectedRoute>
@@ -118,6 +119,7 @@ function App() {
             <ProtectedRoute
               allowedRoles={["owner", "tenant"]}
               userRole={currentUser?.role}
+              isLoading={isLoading}
             >
               <DashboardPage />
             </ProtectedRoute>
@@ -129,6 +131,7 @@ function App() {
             <ProtectedRoute
               allowedRoles={["cashier", "admin", "owner"]}
               userRole={currentUser?.role}
+              isLoading={isLoading}
             >
               <CashierPage />
             </ProtectedRoute>
@@ -154,11 +157,26 @@ function ProtectedRoute({
   children,
   allowedRoles,
   userRole,
+  isLoading,
 }: {
   children: React.ReactNode;
   allowedRoles: string[];
   userRole?: string;
+  isLoading?: boolean;
 }) {
+  if (isLoading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "#f5f5f5" }}
+      >
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[#ff9e2c]/30 border-t-[#ff9e2c] rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground font-heading">Loading...</p>
+        </div>
+      </div>
+    );
+  }
   if (!userRole) return <Navigate to="/login" replace />;
   if (!allowedRoles.includes(userRole)) {
     return <Navigate to={getRedirectPath(userRole)} replace />;
