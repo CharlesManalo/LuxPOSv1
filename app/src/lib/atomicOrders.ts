@@ -190,13 +190,17 @@ export async function createOrderAtomic(
 
   // 7. CREATE ORDER ITEMS
   const itemsWithOrderId = orderItems.map((item) => ({
-    ...item,
+    product_id: item.product_id,
+    product_name: item.product_name,
+    variant_name: item.variant_name,
+    qty: item.qty,
+    unit_price: item.unit_price,
     order_id: createdOrder.id,
   }));
 
   const { error: itemsError } = await getSupabase()
     .from("order_items")
-    .insert(itemsWithOrderId as any);
+    .insert(itemsWithOrderId);
 
   if (itemsError) handleSupabaseError(itemsError);
 
