@@ -34,7 +34,7 @@ export async function createOrderAtomic(
 
   // 1. FETCH CURRENT INGREDIENT STOCK
   // @ts-ignore
-  const { data: fetchedIngredients, error: ingError } = await supabase
+  const { data: fetchedIngredients, error: ingError } = await getSupabase()
     .from("ingredients")
     .select("*")
     .eq("tenant_id", (order as any).tenant_id);
@@ -218,7 +218,7 @@ export async function restoreIngredientStockOnVoid(
 ): Promise<void> {
   // Get current ingredient info for logging
   // @ts-ignore
-  const { data: ingredient, error: fetchError } = await supabase
+  const { data: ingredient, error: fetchError } = await getSupabase()
     .from("ingredients")
     .select("*")
     .eq("id", ingredientId)

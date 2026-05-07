@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
 import {
   Plus,
@@ -14,6 +14,10 @@ import {
   Check,
   X,
   ChefHat,
+  Camera,
+  Printer,
+  ReceiptText,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,11 +33,23 @@ import {
 import { createOrderWithInventory } from "@/lib/atomicOrders";
 import type { Product, Category, ProductVariant, PaymentMethod } from "@/types";
 import { Receipt } from "@/components/Receipt";
+import { useToast } from "@/components/ui/toast";
 import gsap from "gsap";
 
+// ─── Step type ────────────────────────────────────────────────────────────────
+type CheckoutStep =
+  | "catalog"
+  | "payment"
+  | "cash-input"
+  | "digital-payment"
+  | "order-complete"
+  | "receipt";
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export function CashierPage() {
   const navigate = useNavigate();
-  const { currentUser, logout } = useAuth();
+  const { currentUser } = useAuth();
+  const { showToast, ToastContainer } = useToast();
   const {
     currentTenant,
     setCurrentTenant,
@@ -46,6 +62,7 @@ export function CashierPage() {
     getCartCount,
   } = useStore();
 
+  // ── Data state ──
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [ingredients, setIngredients] = useState<any[]>([]);
@@ -53,29 +70,39 @@ export function CashierPage() {
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+
+  // ── Checkout / payment state ──
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [checkoutStep, setCheckoutStep] = useState<
-    "catalog" | "payment" | "success" | "receipt"
-  >("catalog");
+  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>("catalog");
   const [orderNumber, setOrderNumber] = useState("");
   const [receiptConfig, setReceiptConfig] = useState(
     currentTenant?.receipt_config || null,
   );
+
+  // ── New: payment input state ──
+  const [amountReceived, setAmountReceived] = useState<string>("");
+  const [amountError, setAmountError] = useState<string>("");
+  const [isExactPayment, setIsExactPayment] = useState<boolean>(true);
+  const [changeAmount, setChangeAmount] = useState<number>(0);
+  const [orderCreating, setOrderCreating] = useState<boolean>(false);
+
+  // ── UI state ──
   const [lowStockAlert, setLowStockAlert] = useState<string[]>([]);
   const [showSuccessFlash, setShowSuccessFlash] = useState(false);
   const [showCartModal, setShowCartModal] = useState(false);
 
   const cartItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const modalRef = useRef<HTMLDivElement>(null);
+  const amountInputRef = useRef<HTMLInputElement>(null);
 
-  // Redirect non-cashier
+  // ── Redirect non-cashier ──
   useEffect(() => {
     if (currentUser && currentUser.role !== "cashier") {
       navigate(currentUser.role === "admin" ? "/admin" : "/dashboard");
     }
   }, [currentUser, navigate]);
 
-  // Load data
+  // ── Load data (single effect, no checkoutStep dependency) ──
   useEffect(() => {
     if (currentUser?.tenant_id) {
       getTenant(currentUser.tenant_id).then((t) => {
@@ -89,28 +116,35 @@ export function CashierPage() {
         setProducts(p);
         setCategories(c);
         setIngredients(i);
+        const low = i
+          .filter((ing: any) => ing.stock_qty <= ing.low_stock_threshold)
+          .map((ing: any) => ing.name);
+        setLowStockAlert(low);
       });
     }
   }, [currentUser, setCurrentTenant]);
 
-  // Check low stock
+  // ── Sync receipt config when tenant loads ──
   useEffect(() => {
-    if (currentUser?.tenant_id) {
-      getIngredients(currentUser.tenant_id).then((ings) => {
-        const low = ings
-          .filter((i) => i.stock_qty <= i.low_stock_threshold)
-          .map((i) => i.name);
-        setLowStockAlert(low);
-      });
-    }
-  }, [currentUser, checkoutStep]);
-
-  // Update receipt config when tenant changes
-  useEffect(() => {
-    if (currentTenant) {
-      setReceiptConfig(currentTenant.receipt_config);
-    }
+    if (currentTenant) setReceiptConfig(currentTenant.receipt_config);
   }, [currentTenant]);
+
+  // ── Auto-focus amount input when stepping into payment screens ──
+  useEffect(() => {
+    if (
+      (checkoutStep === "cash-input" ||
+        (checkoutStep === "digital-payment" && !isExactPayment)) &&
+      amountInputRef.current
+    ) {
+      setTimeout(() => amountInputRef.current?.focus(), 100);
+    }
+  }, [checkoutStep, isExactPayment]);
+
+  // ── Derived values ──
+  const total = getCartTotal();
+  const serviceCharge = total * 0;
+  const grandTotal = total + serviceCharge;
+  const cartCount = getCartCount();
 
   const filteredProducts = products.filter((p) => {
     const matchesCategory =
@@ -119,36 +153,41 @@ export function CashierPage() {
     return matchesCategory && matchesSearch;
   });
 
-  // UPGRADE 1: Real-time product availability computation
-  function getProductAvailability(product: Product, ingredients: any[]) {
-    if (!product.recipe || product.recipe.length === 0) return true;
+  // Live change calculation (reactive to input)
+  const liveChange = useMemo(() => {
+    const received = parseFloat(amountReceived);
+    if (isNaN(received) || received < grandTotal) return null;
+    return received - grandTotal;
+  }, [amountReceived, grandTotal]);
 
+  // ── Availability helpers ──
+  function getProductAvailability(product: Product, ings: any[]) {
+    if (!product.recipe || product.recipe.length === 0) return true;
     return product.recipe.every((req) => {
-      const ing = ingredients.find((i) => i.id === req.ingredient_id);
+      const ing = ings.find((i) => i.id === req.ingredient_id);
       return ing && ing.stock_qty >= req.qty_required;
     });
   }
 
-  // UPGRADE 2: Pre-cart validation to prevent overselling
-  function canAddToCart(product: Product, ingredients: any[], qty = 1) {
+  function canAddToCart(product: Product, ings: any[], qty = 1) {
     if (!product.recipe) return true;
-
     return product.recipe.every((req) => {
-      const ing = ingredients.find((i) => i.id === req.ingredient_id);
+      const ing = ings.find((i) => i.id === req.ingredient_id);
       return ing && ing.stock_qty >= req.qty_required * qty;
     });
   }
 
-  // Real-time availability map
-  const availabilityMap = new Map(
-    products.map((p) => [p.id, getProductAvailability(p, ingredients)]),
+  const availabilityMap = useMemo(
+    () =>
+      new Map(
+        products.map((p) => [p.id, getProductAvailability(p, ingredients)]),
+      ),
+    [products, ingredients],
   );
 
+  // ── Product click ──
   const handleProductClick = async (product: Product) => {
-    // UPGRADE 2: Pre-cart validation to prevent overselling
-    if (!canAddToCart(product, ingredients, 1)) {
-      return; // Optionally show toast later
-    }
+    if (!canAddToCart(product, ingredients, 1)) return;
 
     if (!product.has_variants) {
       addToCart({
@@ -158,7 +197,6 @@ export function CashierPage() {
         image_url: product.image_url,
         qty: 1,
       });
-      // Animate cart item
       const key = `${product.id}-undefined`;
       if (cartItemRefs.current[key]) {
         gsap.from(cartItemRefs.current[key], {
@@ -169,6 +207,7 @@ export function CashierPage() {
       }
       return;
     }
+
     setSelectedProduct(product);
     const vars = await getProductVariants(product.id);
     setVariants(vars);
@@ -196,70 +235,14 @@ export function CashierPage() {
     setVariants([]);
   };
 
-  const handleSendOrder = async () => {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // PAYMENT FLOW
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Single, unified order-creation function — eliminates the double-call bug */
+  const submitOrder = async (received: number, change: number) => {
     if (!currentUser) return;
-
-    const total = getCartTotal();
-
-    // Handle different payment methods
-    if (paymentMethod === "cash") {
-      // Cash payment flow
-      const amountReceived = prompt("Enter amount received from customer.");
-      if (amountReceived === null) return;
-
-      const received = parseFloat(amountReceived);
-      if (isNaN(received) || received < total) {
-        alert("Invalid amount. Amount must be at least the total due.");
-        return;
-      }
-
-      const change = received - total;
-
-      // Show change and options
-      const action = confirm(
-        `Change: ₱${change.toFixed(2)}\n\nProceed with transaction?`,
-      );
-      if (!action) return;
-
-      // Create order with cash payment
-      await createOrderWithPayment(total, "cash", received, change);
-    } else if (paymentMethod === "gcash" || paymentMethod === "maya") {
-      // GCash/Maya payment flow
-      const isExact = confirm("Is payment exact?");
-
-      let received = total;
-      let change = 0;
-
-      if (!isExact) {
-        const amountReceived = prompt("Enter amount received from customer.");
-        if (amountReceived === null) return;
-
-        received = parseFloat(amountReceived);
-        if (isNaN(received) || received < total) {
-          alert("Invalid amount. Amount must be at least the total due.");
-          return;
-        }
-        change = received - total;
-      }
-
-      const paymentLabel = paymentMethod === "gcash" ? "GCash" : "Maya";
-      const reminder =
-        "Verify payment and take a screenshot/photo of the transaction receipt.";
-
-      // Show payment details and options
-      const action = confirm(
-        `Payment: ${paymentLabel}\nChange: ₱${change.toFixed(2)}\n\n${reminder}\n\nProceed with transaction?`,
-      );
-      if (!action) return;
-
-      // Create order with digital payment
-      await createOrderWithPayment(total, paymentMethod, received, change);
-    } else {
-      alert("Please select a payment method.");
-      return;
-    }
-
-    // 🔄 ATOMIC ORDER CREATION WITH INVENTORY DEDUCTION
+    setOrderCreating(true);
     try {
       const orderItems = cart.map((item) => ({
         product_id: item.product_id,
@@ -267,24 +250,23 @@ export function CashierPage() {
         variant_name: item.variant_name,
         qty: item.qty,
         unit_price: item.price,
-        order_id: "", // This will be set by the atomic order function
+        order_id: "",
       }));
 
-      // Create order with atomic inventory deduction
       const order = await createOrderWithInventory(
         {
           tenant_id: currentUser.tenant_id,
           cashier_id: currentUser.id,
           status: "completed",
           payment_method: paymentMethod,
-          total,
+          total: grandTotal,
         },
         orderItems,
         products,
         ingredients,
       );
 
-      // Refresh data to reflect new stock levels
+      // Refresh stock levels
       const [updatedProducts, updatedIngredients] = await Promise.all([
         getProducts(currentUser.tenant_id),
         getIngredients(currentUser.tenant_id),
@@ -292,31 +274,82 @@ export function CashierPage() {
       setProducts(updatedProducts);
       setIngredients(updatedIngredients);
 
+      // Refresh low-stock alerts after order
+      const low = updatedIngredients
+        .filter((i: any) => i.stock_qty <= i.low_stock_threshold)
+        .map((i: any) => i.name);
+      setLowStockAlert(low);
+
       setOrderNumber(order.id.split("-")[1] || order.id);
+      setChangeAmount(change);
       setShowSuccessFlash(true);
       setTimeout(() => setShowSuccessFlash(false), 600);
-
-      setTimeout(() => {
-        setCheckoutStep("receipt");
-      }, 300);
+      setCheckoutStep("order-complete");
     } catch (error) {
-      console.error("Order submission failed:", error);
-      alert(
+      showToast(
         `Order failed: ${error instanceof Error ? error.message : "Please try again."}`,
+        "error",
       );
+    } finally {
+      setOrderCreating(false);
     }
   };
 
-  const createOrderWithPayment = async (
-    total: number,
-    method: string,
-    received: number,
-    change: number,
-  ) => {
-    // This function will be expanded with receipt options later
-    console.log(
-      `Creating order: ${method}, Total: ₱${total}, Received: ₱${received}, Change: ₱${change}`,
-    );
+  /** Routes to the correct payment input screen — no dialog boxes */
+  const handleGoToPaymentInput = () => {
+    setAmountReceived("");
+    setAmountError("");
+    setIsExactPayment(true);
+    if (paymentMethod === "cash") {
+      setCheckoutStep("cash-input");
+    } else {
+      setCheckoutStep("digital-payment");
+    }
+  };
+
+  /** Cash: validate input then create order */
+  const handleCashConfirm = () => {
+    const received = parseFloat(amountReceived);
+    if (isNaN(received) || received <= 0) {
+      setAmountError("Please enter a valid amount.");
+      return;
+    }
+    if (received < grandTotal) {
+      setAmountError(
+        `Amount is short by ₱${(grandTotal - received).toFixed(2)}`,
+      );
+      return;
+    }
+    setAmountError("");
+    submitOrder(received, received - grandTotal);
+  };
+
+  /** GCash / Maya: validate then create order */
+  const handleDigitalConfirm = () => {
+    if (isExactPayment) {
+      submitOrder(grandTotal, 0);
+    } else {
+      const received = parseFloat(amountReceived);
+      if (isNaN(received) || received <= 0) {
+        setAmountError("Please enter a valid amount.");
+        return;
+      }
+      if (received < grandTotal) {
+        setAmountError(
+          `Amount is short by ₱${(grandTotal - received).toFixed(2)}`,
+        );
+        return;
+      }
+      setAmountError("");
+      submitOrder(received, received - grandTotal);
+    }
+  };
+
+  const handleViewReceipt = () => setCheckoutStep("receipt");
+
+  const handlePrintReceipt = () => {
+    window.print();
+    handleNewOrder();
   };
 
   const handleNewOrder = () => {
@@ -324,13 +357,15 @@ export function CashierPage() {
     setCheckoutStep("catalog");
     setPaymentMethod("cash");
     setOrderNumber("");
+    setAmountReceived("");
+    setChangeAmount(0);
+    setAmountError("");
+    setIsExactPayment(true);
   };
 
-  const total = getCartTotal();
-  const serviceCharge = total * 0;
-  const grandTotal = total + serviceCharge;
-  const cartCount = getCartCount();
-
+  // ─────────────────────────────────────────────────────────────────────────────
+  // LOADING GUARD
+  // ─────────────────────────────────────────────────────────────────────────────
   if (!currentUser) {
     return (
       <div
@@ -345,12 +380,18 @@ export function CashierPage() {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div
       className="h-screen flex overflow-hidden max-w-full"
       style={{ background: "#f5f5f5" }}
     >
-      {/* Success flash overlay */}
+      {/* Toast Container */}
+      <ToastContainer />
+
+      {/* ── Success flash overlay ── */}
       {showSuccessFlash && (
         <div
           className="fixed inset-0 z-50 pointer-events-none"
@@ -358,7 +399,9 @@ export function CashierPage() {
         />
       )}
 
-      {/* Left: Catalog */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* CATALOG                                                                */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {checkoutStep === "catalog" && (
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar */}
@@ -374,7 +417,7 @@ export function CashierPage() {
                 {currentUser.full_name}
               </p>
             </div>
-            {/* Cart Toggle Button - Mobile */}
+            {/* Cart Toggle - Mobile */}
             <button
               onClick={() => setShowCartModal(true)}
               className="lg:hidden relative w-8 h-8 rounded-full bg-accent-orange flex items-center justify-center shrink-0 hover:bg-accent-hover transition-colors"
@@ -396,21 +439,12 @@ export function CashierPage() {
               />
             </div>
             {lowStockAlert.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-2 py-1 flex items-center gap-1 shrink-0 hidden sm:block">
-                <span className="text-xs text-red-600 font-medium truncate">
-                  Low stock: {lowStockAlert.join(", ")}
+              <div className="bg-red-50 border border-red-200 rounded-lg px-2 py-1 items-center gap-1 shrink-0 hidden sm:flex">
+                <span className="text-xs text-red-600 font-medium truncate max-w-[200px]">
+                  ⚠ Low stock: {lowStockAlert.join(", ")}
                 </span>
               </div>
             )}
-            <button
-              onClick={() => {
-                logout();
-                navigate("/login");
-              }}
-              className="text-xs sm:text-sm text-muted-foreground hover:text-[#2c2c2c] shrink-0 hidden sm:block"
-            >
-              Logout
-            </button>
           </div>
 
           {/* Category Filters */}
@@ -445,18 +479,20 @@ export function CashierPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
               {filteredProducts.map((product) => {
                 const inCart = cart.find((c) => c.product_id === product.id);
+                const available = availabilityMap.get(product.id);
                 return (
                   <button
                     key={product.id}
                     onClick={() => {
-                      if (!availabilityMap.get(product.id)) return;
+                      if (!available) return;
                       handleProductClick(product);
                     }}
+                    disabled={!available}
                     className={`bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:scale-[1.03] transition-all duration-200 text-left group ${
                       inCart
                         ? "ring-2 sm:ring-4 ring-[#ff9e2c] bg-orange-50/50"
                         : ""
-                    }`}
+                    } ${!available ? "opacity-60 cursor-not-allowed hover:scale-100 hover:shadow-sm" : ""}`}
                   >
                     <div className="aspect-square bg-[#f5f5f5] relative overflow-hidden">
                       {product.image_url ? (
@@ -470,9 +506,9 @@ export function CashierPage() {
                           <ShoppingCart className="w-8 h-8 sm:w-10 sm:h-10 text-[#e0e0e0]" />
                         </div>
                       )}
-                      {!availabilityMap.get(product.id) && (
+                      {!available && (
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                          <span className="text-white text-xs font-bold uppercase">
+                          <span className="text-white text-xs font-bold uppercase tracking-wide">
                             No Stock
                           </span>
                         </div>
@@ -488,7 +524,7 @@ export function CashierPage() {
                         {product.name}
                       </h3>
                       <p className="text-accent-orange font-mono font-semibold text-xs sm:text-sm mt-0.5">
-                        P{product.price.toFixed(2)}
+                        ₱{product.price.toFixed(2)}
                       </p>
                     </div>
                   </button>
@@ -499,12 +535,14 @@ export function CashierPage() {
         </div>
       )}
 
-      {/* Payment Screen */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* SELECT PAYMENT METHOD                                                 */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {checkoutStep === "payment" && (
-        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative">
           <button
             onClick={() => setCheckoutStep("catalog")}
-            className="absolute top-4 left-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-[#2c2c2c]"
+            className="absolute top-4 left-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-[#2c2c2c] transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
             Back to order
@@ -518,7 +556,7 @@ export function CashierPage() {
           <div className="text-center mb-8">
             <p className="text-sm text-muted-foreground">Total Amount</p>
             <p className="text-5xl font-heading font-bold text-[#2c2c2c]">
-              P{grandTotal.toFixed(2)}
+              ₱{grandTotal.toFixed(2)}
             </p>
           </div>
 
@@ -550,28 +588,414 @@ export function CashierPage() {
           </div>
 
           <Button
-            onClick={handleSendOrder}
+            onClick={handleGoToPaymentInput}
             className="w-full max-w-md h-14 rounded-full bg-accent-orange hover:bg-accent-hover text-white text-xl font-heading font-semibold shadow-float active:scale-[0.98] transition-transform"
           >
             <Send className="w-5 h-5 mr-2" />
-            Send Order
+            Continue
           </Button>
         </div>
       )}
 
-      {/* Success Screen */}
-      {checkoutStep === "success" && (
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
-          <div className="w-20 h-20 rounded-full bg-success-green flex items-center justify-center mb-6 shadow-float-green">
-            <Check className="w-10 h-10 text-white" />
-          </div>
-          <h2 className="text-3xl font-heading font-bold text-[#2c2c2c] mb-1">
-            Order Sent!
-          </h2>
-          <p className="text-muted-foreground mb-6">Order #{orderNumber}</p>
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* CASH INPUT                                                             */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {checkoutStep === "cash-input" && (
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative">
+          <button
+            onClick={() => setCheckoutStep("payment")}
+            className="absolute top-4 left-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-[#2c2c2c] transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
 
-          {/* Receipt */}
-          {currentTenant?.receipt_printing_enabled && receiptConfig && (
+          <div className="w-full max-w-md">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="w-14 h-14 rounded-2xl bg-accent-orange/10 flex items-center justify-center mx-auto mb-4">
+                <Banknote className="w-7 h-7 text-accent-orange" />
+              </div>
+              <h2 className="text-3xl font-heading font-bold text-[#2c2c2c] mb-1">
+                Cash Payment
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                Enter the amount received from the customer
+              </p>
+            </div>
+
+            {/* Total */}
+            <div className="bg-[#f5f5f5] rounded-2xl p-4 flex justify-between items-center mb-6">
+              <span className="text-muted-foreground font-medium">
+                Total Due
+              </span>
+              <span className="text-2xl font-heading font-bold text-[#2c2c2c]">
+                ₱{grandTotal.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Amount Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[#2c2c2c] mb-2">
+                Amount Received (₱)
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground">
+                  ₱
+                </span>
+                <Input
+                  ref={amountInputRef}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amountReceived}
+                  onChange={(e) => {
+                    setAmountReceived(e.target.value);
+                    setAmountError("");
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleCashConfirm()}
+                  placeholder="0.00"
+                  className="pl-9 h-16 text-2xl font-mono font-bold text-center rounded-2xl border-2 border-[#e0e0e0] focus:border-accent-orange"
+                />
+              </div>
+              {amountError && (
+                <p className="text-danger-red text-sm mt-2 flex items-center gap-1">
+                  <X className="w-3.5 h-3.5" />
+                  {amountError}
+                </p>
+              )}
+            </div>
+
+            {/* Live Change Display */}
+            <div
+              className={`rounded-2xl p-4 mb-6 flex justify-between items-center transition-all duration-200 ${
+                liveChange !== null
+                  ? "bg-green-50 border-2 border-green-200"
+                  : "bg-[#f5f5f5] border-2 border-transparent"
+              }`}
+            >
+              <span className="font-medium text-muted-foreground">Change</span>
+              <span
+                className={`text-2xl font-heading font-bold ${
+                  liveChange !== null ? "text-success-green" : "text-[#e0e0e0]"
+                }`}
+              >
+                ₱{liveChange !== null ? liveChange.toFixed(2) : "—"}
+              </span>
+            </div>
+
+            {/* Confirm Button */}
+            <Button
+              onClick={handleCashConfirm}
+              disabled={orderCreating || !amountReceived}
+              className="w-full h-14 rounded-full bg-accent-orange hover:bg-accent-hover text-white text-lg font-heading font-semibold shadow-float active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {orderCreating ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Processing…
+                </>
+              ) : (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Confirm Payment
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* DIGITAL PAYMENT (GCash / Maya)                                        */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {checkoutStep === "digital-payment" && (
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-auto">
+          <button
+            onClick={() => setCheckoutStep("payment")}
+            className="absolute top-4 left-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-[#2c2c2c] transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
+
+          <div className="w-full max-w-md py-8">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="w-14 h-14 rounded-2xl bg-accent-orange/10 flex items-center justify-center mx-auto mb-4">
+                {paymentMethod === "gcash" ? (
+                  <Wallet className="w-7 h-7 text-accent-orange" />
+                ) : (
+                  <CreditCard className="w-7 h-7 text-accent-orange" />
+                )}
+              </div>
+              <h2 className="text-3xl font-heading font-bold text-[#2c2c2c] mb-1">
+                {paymentMethod === "gcash" ? "GCash" : "Maya"} Payment
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                Confirm payment details below
+              </p>
+            </div>
+
+            {/* Total */}
+            <div className="bg-[#f5f5f5] rounded-2xl p-4 flex justify-between items-center mb-6">
+              <span className="text-muted-foreground font-medium">
+                Total Due
+              </span>
+              <span className="text-2xl font-heading font-bold text-[#2c2c2c]">
+                ₱{grandTotal.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Exact toggle */}
+            <div className="mb-6">
+              <p className="text-sm font-medium text-[#2c2c2c] mb-3">
+                Is the payment exact?
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setIsExactPayment(true);
+                    setAmountReceived("");
+                    setAmountError("");
+                  }}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                    isExactPayment
+                      ? "border-[#ff9e2c] bg-orange-50"
+                      : "border-[#e0e0e0] bg-white hover:border-[#d0d0d0]"
+                  }`}
+                >
+                  <Check
+                    className={`w-6 h-6 ${isExactPayment ? "text-accent-orange" : "text-muted-foreground"}`}
+                  />
+                  <span
+                    className={`font-medium text-sm ${isExactPayment ? "text-accent-orange" : "text-[#2c2c2c]"}`}
+                  >
+                    Yes, Exact
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsExactPayment(false);
+                    setAmountError("");
+                  }}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                    !isExactPayment
+                      ? "border-[#ff9e2c] bg-orange-50"
+                      : "border-[#e0e0e0] bg-white hover:border-[#d0d0d0]"
+                  }`}
+                >
+                  <Banknote
+                    className={`w-6 h-6 ${!isExactPayment ? "text-accent-orange" : "text-muted-foreground"}`}
+                  />
+                  <span
+                    className={`font-medium text-sm ${!isExactPayment ? "text-accent-orange" : "text-[#2c2c2c]"}`}
+                  >
+                    No, Enter Amount
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Amount input if not exact */}
+            {!isExactPayment && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#2c2c2c] mb-2">
+                  Amount Received (₱)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground">
+                    ₱
+                  </span>
+                  <Input
+                    ref={amountInputRef}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amountReceived}
+                    onChange={(e) => {
+                      setAmountReceived(e.target.value);
+                      setAmountError("");
+                    }}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && handleDigitalConfirm()
+                    }
+                    placeholder="0.00"
+                    className="pl-9 h-16 text-2xl font-mono font-bold text-center rounded-2xl border-2 border-[#e0e0e0] focus:border-accent-orange"
+                  />
+                </div>
+                {amountError && (
+                  <p className="text-danger-red text-sm mt-2 flex items-center gap-1">
+                    <X className="w-3.5 h-3.5" />
+                    {amountError}
+                  </p>
+                )}
+
+                {/* Live Change */}
+                <div
+                  className={`rounded-2xl p-4 mt-3 flex justify-between items-center transition-all duration-200 ${
+                    liveChange !== null
+                      ? "bg-green-50 border-2 border-green-200"
+                      : "bg-[#f5f5f5] border-2 border-transparent"
+                  }`}
+                >
+                  <span className="font-medium text-muted-foreground">
+                    Change
+                  </span>
+                  <span
+                    className={`text-2xl font-heading font-bold ${
+                      liveChange !== null
+                        ? "text-success-green"
+                        : "text-[#e0e0e0]"
+                    }`}
+                  >
+                    ₱{liveChange !== null ? liveChange.toFixed(2) : "—"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Reminder banner */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex gap-3 items-start">
+              <Camera className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-amber-700 text-sm leading-relaxed">
+                <span className="font-semibold">Reminder:</span> Verify payment
+                and take a screenshot/photo of the{" "}
+                {paymentMethod === "gcash" ? "GCash" : "Maya"} transaction
+                receipt before proceeding.
+              </p>
+            </div>
+
+            {/* Confirm */}
+            <Button
+              onClick={handleDigitalConfirm}
+              disabled={orderCreating || (!isExactPayment && !amountReceived)}
+              className="w-full h-14 rounded-full bg-accent-orange hover:bg-accent-hover text-white text-lg font-heading font-semibold shadow-float active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {orderCreating ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Processing…
+                </>
+              ) : (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Confirm Payment
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* ORDER COMPLETE                                                         */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {checkoutStep === "order-complete" && (
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
+          <div className="w-full max-w-sm">
+            {/* Success icon */}
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-20 h-20 rounded-full bg-success-green flex items-center justify-center mb-4 shadow-float-green">
+                <Check className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-heading font-bold text-[#2c2c2c] mb-1">
+                Payment Complete!
+              </h2>
+              <p className="text-muted-foreground">Order #{orderNumber}</p>
+            </div>
+
+            {/* Summary card */}
+            <div className="bg-[#f5f5f5] rounded-2xl p-5 mb-6 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-sm">
+                  Payment Method
+                </span>
+                <span className="font-medium text-sm capitalize">
+                  {paymentMethod === "gcash"
+                    ? "GCash"
+                    : paymentMethod === "maya"
+                      ? "Maya"
+                      : "Cash"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-sm">
+                  Total Paid
+                </span>
+                <span className="font-mono font-semibold">
+                  ₱{grandTotal.toFixed(2)}
+                </span>
+              </div>
+              {changeAmount > 0 && (
+                <>
+                  <div className="h-px bg-[#e0e0e0]" />
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-lg">Change</span>
+                    <span className="font-heading font-bold text-2xl text-success-green">
+                      ₱{changeAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* Digital payment reminder */}
+              {(paymentMethod === "gcash" || paymentMethod === "maya") && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-1 flex gap-2 items-start">
+                  <Camera className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-amber-700 text-xs leading-relaxed">
+                    Remember to verify the{" "}
+                    {paymentMethod === "gcash" ? "GCash" : "Maya"} transaction
+                    screenshot/photo.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="space-y-3">
+              <Button
+                onClick={handleNewOrder}
+                className="w-full h-12 rounded-full bg-accent-orange hover:bg-accent-hover text-white font-heading font-semibold shadow-float"
+              >
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Proceed — No Receipt
+              </Button>
+
+              <Button
+                onClick={handleViewReceipt}
+                variant="outline"
+                className="w-full h-12 rounded-full border-2 border-[#e0e0e0] bg-white text-[#2c2c2c] font-heading font-semibold hover:border-[#d0d0d0]"
+              >
+                <ReceiptText className="w-4 h-4 mr-2" />
+                View Receipt
+              </Button>
+
+              {currentTenant?.receipt_printing_enabled && (
+                <Button
+                  onClick={handlePrintReceipt}
+                  variant="outline"
+                  className="w-full h-12 rounded-full border-2 border-[#e0e0e0] bg-white text-[#2c2c2c] font-heading font-semibold hover:border-[#d0d0d0]"
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print Receipt
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* RECEIPT VIEW                                                           */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {checkoutStep === "receipt" && (
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 overflow-auto">
+          <h2 className="text-2xl font-heading font-bold text-[#2c2c2c] mb-6">
+            Receipt — Order #{orderNumber}
+          </h2>
+
+          {receiptConfig && (
             <div className="mb-6">
               <Receipt
                 orderNumber={orderNumber}
@@ -584,34 +1008,33 @@ export function CashierPage() {
             </div>
           )}
 
-          {/* Receipt Options */}
-          <div className="flex gap-4 mb-6">
+          <div className="flex gap-3">
+            {currentTenant?.receipt_printing_enabled && (
+              <Button
+                onClick={handlePrintReceipt}
+                className="h-12 rounded-full bg-accent-orange hover:bg-accent-hover text-white px-6 font-heading font-semibold"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Print
+              </Button>
+            )}
             <Button
-              onClick={() => alert("View receipt functionality coming soon!")}
-              className="flex-1 h-12 rounded-full bg-white border-2 border-[#e0e0e0] text-[#2c2c2c] px-4 shadow-float font-heading font-semibold"
+              onClick={handleNewOrder}
+              variant="outline"
+              className="h-12 rounded-full border-2 border-[#e0e0e0] bg-white text-[#2c2c2c] px-6 font-heading font-semibold hover:border-[#d0d0d0]"
             >
-              View Receipt
-            </Button>
-            <Button
-              onClick={() => alert("Print receipt functionality coming soon!")}
-              className="flex-1 h-12 rounded-full bg-white border-2 border-[#e0e0e0] text-[#2c2c2c] px-4 shadow-float font-heading font-semibold"
-            >
-              Print Receipt
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              New Order
             </Button>
           </div>
-
-          <Button
-            onClick={handleNewOrder}
-            className="h-12 rounded-full bg-accent-orange hover:bg-accent-hover text-white px-8 shadow-float font-heading font-semibold"
-          >
-            New Order
-          </Button>
         </div>
       )}
 
-      {/* Right: Cart Sidebar - Hidden on Mobile */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* CART SIDEBAR (desktop)                                                 */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {checkoutStep === "catalog" && (
-        <div className="hidden lg:block w-[360px] bg-white border-l border-[#e0e0e0] flex flex-col shrink-0 shadow-lg">
+        <div className="hidden lg:flex w-[360px] bg-white border-l border-[#e0e0e0] flex-col shrink-0 shadow-lg">
           {/* Header */}
           <div className="p-4 border-b border-[#e0e0e0]">
             <h2 className="font-heading font-bold text-xl text-[#2c2c2c]">
@@ -620,7 +1043,7 @@ export function CashierPage() {
             <p className="text-sm text-muted-foreground">{cartCount} items</p>
           </div>
 
-          {/* Cart Items */}
+          {/* Items */}
           <div className="flex-1 overflow-auto p-4 space-y-2">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
@@ -653,7 +1076,7 @@ export function CashierPage() {
                       </p>
                     )}
                     <p className="text-xs text-accent-orange font-mono mt-0.5">
-                      P{item.price.toFixed(2)} x {item.qty}
+                      ₱{item.price.toFixed(2)} × {item.qty}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -703,17 +1126,17 @@ export function CashierPage() {
             <div className="p-4 border-t border-[#e0e0e0] space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-mono">P{total.toFixed(2)}</span>
+                <span className="font-mono">₱{total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Service Charge</span>
-                <span className="font-mono">P{serviceCharge.toFixed(2)}</span>
+                <span className="font-mono">₱{serviceCharge.toFixed(2)}</span>
               </div>
               <div className="receipt-line" />
               <div className="flex justify-between">
                 <span className="font-heading font-bold text-lg">Total</span>
                 <span className="font-heading font-bold text-2xl text-accent-orange">
-                  P{grandTotal.toFixed(2)}
+                  ₱{grandTotal.toFixed(2)}
                 </span>
               </div>
               <Button
@@ -734,7 +1157,9 @@ export function CashierPage() {
         </div>
       )}
 
-      {/* Variant Selection Modal */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* VARIANT SELECTION MODAL                                               */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {selectedProduct && variants.length > 0 && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center"
@@ -778,7 +1203,7 @@ export function CashierPage() {
                 >
                   <span className="font-medium">{v.name}</span>
                   <span className="font-mono text-accent-orange font-semibold">
-                    P{v.price.toFixed(2)}
+                    ₱{v.price.toFixed(2)}
                   </span>
                 </button>
               ))}
@@ -787,7 +1212,9 @@ export function CashierPage() {
         </div>
       )}
 
-      {/* Floating Cart Button - Mobile (when cart has items) */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* FLOATING CART BUTTON (mobile)                                         */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {checkoutStep === "catalog" && cart.length > 0 && (
         <button
           onClick={() => setShowCartModal(true)}
@@ -800,7 +1227,9 @@ export function CashierPage() {
         </button>
       )}
 
-      {/* Cart Modal - Mobile */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* CART MODAL (mobile)                                                   */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {showCartModal && checkoutStep === "catalog" && (
         <div
           className="fixed inset-0 z-50 flex items-end lg:hidden"
@@ -829,7 +1258,7 @@ export function CashierPage() {
               </button>
             </div>
 
-            {/* Cart Items */}
+            {/* Items */}
             <div className="flex-1 overflow-auto p-4 space-y-2">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center py-8">
@@ -857,7 +1286,7 @@ export function CashierPage() {
                         </p>
                       )}
                       <p className="text-xs text-accent-orange font-mono mt-0.5">
-                        P{item.price.toFixed(2)} x {item.qty}
+                        ₱{item.price.toFixed(2)} × {item.qty}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -907,17 +1336,17 @@ export function CashierPage() {
               <div className="p-4 border-t border-[#e0e0e0] space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-mono">P{total.toFixed(2)}</span>
+                  <span className="font-mono">₱{total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Service Charge</span>
-                  <span className="font-mono">P{serviceCharge.toFixed(2)}</span>
+                  <span className="font-mono">₱{serviceCharge.toFixed(2)}</span>
                 </div>
                 <div className="receipt-line" />
                 <div className="flex justify-between">
                   <span className="font-heading font-bold text-lg">Total</span>
                   <span className="font-heading font-bold text-2xl text-accent-orange">
-                    P{grandTotal.toFixed(2)}
+                    ₱{grandTotal.toFixed(2)}
                   </span>
                 </div>
                 <Button
