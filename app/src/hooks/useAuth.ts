@@ -67,10 +67,17 @@ function initializeAuth() {
     }, 10000);
 
     try {
-      console.log("🔐 Getting session...");
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      console.log("🔐 Getting session with 3-second timeout...");
+
+      // Wrap getSession in a timeout to prevent hanging on unconfigured domains
+      const sessionResult = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("getSession_timeout")), 3000),
+        ),
+      ]);
+
+      const session = (sessionResult as any)?.data?.session;
       console.log("🔐 Session check:", {
         hasSession: !!session,
         userId: session?.user?.id,
@@ -104,7 +111,21 @@ function initializeAuth() {
         console.log("🔐 No session found");
       }
     } catch (err: any) {
-      if (!err?.message?.includes("Lock")) {
+      if (err?.message === "getSession_timeout") {
+        console.error("❌ CRITICAL: getSession() timed out after 3 seconds");
+        console.error(
+          "❌ This domain is likely NOT configured in Supabase auth settings:",
+        );
+        console.error(`❌   Current domain: ${window.location.origin}`);
+        console.error("❌");
+        console.error(
+          "❌ FIX: Go to Supabase Dashboard → Authentication → URL Configuration",
+        );
+        console.error(
+          `❌   Add '${window.location.origin}' to Site URL and Redirect URLs`,
+        );
+        console.error("❌   Also add pattern: '${window.location.origin}/**'");
+      } else if (!err?.message?.includes("Lock")) {
         console.error("Auth initialization error:", err);
       }
     } finally {
