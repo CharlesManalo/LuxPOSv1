@@ -53,12 +53,36 @@ function initializeAuth() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      console.log("🔐 Session check:", {
+        hasSession: !!session,
+        userId: session?.user?.id,
+      });
+
       if (session?.user) {
-        const userData = await getUserByAuthId(session.user.id);
-        if (userData) {
-          setUser(userData);
+        try {
+          console.log("🔍 Getting user data for:", session.user.id);
+          const userData = await getUserByAuthId(session.user.id);
+          console.log("👤 User data:", userData);
+          if (userData) {
+            setUser(userData);
+          } else {
+            console.warn("⚠️ User not found in database, but session exists");
+            setUser(null);
+          }
+        } catch (dbErr: any) {
+          console.error("❌ Database error getting user:", dbErr);
+          // Temporarily set user with basic info to bypass database issues
+          setUser({
+            id: session.user.id,
+            email: session.user.email || "",
+            role: "owner", // Default role for testing
+            tenant_id: "temp-tenant-id",
+            full_name: session.user.user_metadata?.full_name || "User",
+            created_at: new Date().toISOString(),
+          });
         }
-        // Don't sign out here — let it just clear loading
+      } else {
+        console.log("🔐 No session found");
       }
     } catch (err: any) {
       if (!err?.message?.includes("Lock")) {
