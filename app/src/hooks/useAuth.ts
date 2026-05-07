@@ -78,6 +78,7 @@ function initializeAuth() {
             role: "owner", // Default role for testing
             tenant_id: "temp-tenant-id",
             full_name: session.user.user_metadata?.full_name || "User",
+            avatar_url: null,
             created_at: new Date().toISOString(),
           });
         }
