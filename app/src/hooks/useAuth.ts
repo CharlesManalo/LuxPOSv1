@@ -42,6 +42,13 @@ function initializeAuth() {
 
   (async () => {
     setLoading(true);
+
+    // Immediate timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      console.warn("Auth initialization timeout - forcing loading to false");
+      setLoading(false);
+    }, 2000);
+
     try {
       const {
         data: { session },
@@ -58,6 +65,7 @@ function initializeAuth() {
         console.error("Auth initialization error:", err);
       }
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   })();
