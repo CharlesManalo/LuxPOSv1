@@ -193,7 +193,8 @@ export async function createOrderAtomic(
     product_id: item.product_id,
     variant_name: item.variant_name || null,
     quantity: item.qty || 1,
-    total_price: item.unit_price || 0,
+    unit_price: item.unit_price || 0,
+    total_price: (item.unit_price || 0) * (item.qty || 1),
     order_id: createdOrder.id,
   }));
 
@@ -319,7 +320,7 @@ export async function voidOrderWithInventory(
     if (!product?.recipe) continue;
 
     for (const req of product.recipe) {
-      const restoreAmount = req.qty_required * item.qty;
+      const restoreAmount = req.qty_required * item.quantity;
 
       if (!stockRestoration[req.ingredient_id]) {
         stockRestoration[req.ingredient_id] = { amount: 0, name: "" };
