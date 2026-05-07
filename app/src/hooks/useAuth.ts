@@ -41,15 +41,33 @@ function initializeAuth() {
   });
 
   (async () => {
+    console.log("🚀 Starting auth initialization...");
     setLoading(true);
+
+    // Check if Supabase client is working
+    try {
+      console.log("🔧 Testing Supabase client...");
+      const testClient = getSupabaseClient();
+      console.log("✅ Supabase client created successfully");
+    } catch (clientErr) {
+      console.error("❌ Supabase client creation failed:", clientErr);
+      setLoading(false);
+      return;
+    }
 
     // Immediate timeout to prevent infinite loading
     const timeout = setTimeout(() => {
-      console.warn("Auth initialization timeout - forcing loading to false");
+      console.warn(
+        "⏰ Auth initialization timeout after 10 seconds - forcing loading to false",
+      );
+      console.warn(
+        "⏰ This suggests Supabase client or database connectivity issues",
+      );
       setLoading(false);
-    }, 2000);
+    }, 10000);
 
     try {
+      console.log("🔐 Getting session...");
       const {
         data: { session },
       } = await supabase.auth.getSession();
