@@ -42,10 +42,7 @@ import {
   restockIngredient,
   getOrders,
   getOrderItems,
-  createUser,
   getUsers,
-  updateUser,
-  deleteUser,
 } from "@/lib/supabaseDb";
 import { uploadProductImage } from "@/lib/imageUpload";
 import type {
