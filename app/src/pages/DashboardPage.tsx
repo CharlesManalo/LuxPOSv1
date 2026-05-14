@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
 import {
   ShoppingBag,
@@ -271,11 +271,7 @@ export function DashboardPage() {
           <ProductStatusPanel products={products} ingredients={ingredients} />
         )}
         {activeTab === "cashiers" && (
-          <CashierManagementTab
-            cashiers={cashiers}
-            onCashierUpdate={loadData}
-            currentUser={currentUser}
-          />
+          <CashierManagementTab cashiers={cashiers} />
         )}
         {activeTab === "notifications" && (
           <NotificationsTab
@@ -285,6 +281,90 @@ export function DashboardPage() {
           />
         )}
       </main>
+    </div>
+  );
+}
+
+// --- Daily Revenue Chart Component ---
+function DailyRevenueChart({ data }: { data: { date: string; amount: number }[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !data.length) return;
+    
+    // Check if it's dark mode
+    const isDark = document.documentElement.classList.contains("dark");
+    const orange = "#ff9e2c";
+    const faint = isDark ? "rgba(255, 158, 44, 0.1)" : "rgba(255, 158, 44, 0.05)";
+
+    // Destroy previous instance to avoid canvas reuse errors
+    if (chartRef.current) chartRef.current.destroy();
+
+    // Dynamically import Chart.js
+    import("chart.js/auto").then(({ Chart }) => {
+      chartRef.current = new Chart(canvasRef.current!, {
+        type: "bar",
+        data: {
+          labels: data.map((d) => new Date(d.date).getDate()),
+          datasets: [{
+            label: "Revenue",
+            data: data.map((d) => d.amount),
+            backgroundColor: data.map((d) => d.amount > 0 ? orange : faint),
+            borderColor: data.map((d) => d.amount > 0 ? orange : "transparent"),
+            borderWidth: 1,
+            borderRadius: 6,
+            borderSkipped: false,
+            barThickness: 'flex' as any,
+            maxBarThickness: 32,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "#2c2c2c",
+              titleFont: { family: "Fredoka" },
+              bodyFont: { family: "DM Sans" },
+              padding: 12,
+              cornerRadius: 8,
+              callbacks: {
+                label: (ctx: any) => `P${(ctx.raw as number).toLocaleString()}`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                font: { size: 10, family: "DM Sans" },
+                color: "#888",
+              }
+            },
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+              },
+              ticks: {
+                font: { size: 10, family: "DM Sans" },
+                color: "#888",
+                callback: (v: any) => `P${v}`,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    return () => { chartRef.current?.destroy(); };
+  }, [data]);
+
+  return (
+    <div className="w-full h-48 sm:h-64 mt-4">
+      <canvas ref={canvasRef} />
     </div>
   );
 }
@@ -338,33 +418,7 @@ function OverviewTab({ stats }: { stats: DashboardStats | null }) {
           <h3 className="font-heading font-semibold text-base sm:text-lg mb-3 sm:mb-4">
             Daily Revenue (14 days)
           </h3>
-          <div className="flex items-end gap-0.5 sm:gap-1.5 h-32 sm:h-48 overflow-x-auto">
-            {s.dailyRevenue.map((d, i) => {
-              const maxVal = Math.max(
-                ...s.dailyRevenue.map((dd) => dd.amount),
-                1,
-              );
-              const height = (d.amount / maxVal) * 100;
-              return (
-                <div
-                  key={i}
-                  className="flex-1 flex flex-col items-center gap-1"
-                >
-                  <div
-                    className="w-full rounded-t-md bg-accent-orange/80 hover:bg-accent-orange transition-colors relative group"
-                    style={{ height: `${Math.max(height, 4)}%` }}
-                  >
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#2c2c2c] text-white text-xs px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      P{d.amount.toLocaleString()}
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">
-                    {new Date(d.date).getDate()}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <DailyRevenueChart data={s.dailyRevenue} />
         </div>
 
         {/* Payment Breakdown */}
@@ -1698,82 +1752,7 @@ function NotificationsTab({
 }
 
 // ─── Cashier Management Tab ───
-function CashierManagementTab({
-  cashiers,
-  onCashierUpdate,
-  currentUser,
-}: {
-  cashiers: any[];
-  onCashierUpdate: () => void;
-  currentUser: any;
-}) {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingCashier, setEditingCashier] = useState<any>(null);
-  const [newCashier, setNewCashier] = useState({
-    full_name: "",
-    email: "",
-    password: "",
-  });
-
-  const handleAddCashier = async () => {
-    if (!currentUser?.tenant_id) return;
-    if (
-      !newCashier.full_name.trim() ||
-      !newCashier.email.trim() ||
-      !newCashier.password.trim()
-    ) {
-      alert("Please fill in all fields");
-      return;
-    }
-
-    try {
-      await createUser({
-        tenant_id: currentUser.tenant_id,
-        role: "cashier",
-        full_name: newCashier.full_name,
-        email: newCashier.email,
-        avatar_url: null,
-      });
-
-      setShowAddModal(false);
-      setNewCashier({ full_name: "", email: "", password: "" });
-      onCashierUpdate();
-    } catch (error) {
-      console.error("Error creating cashier:", error);
-      alert("Failed to create cashier. Email might already exist.");
-    }
-  };
-
-  const handleUpdateCashier = async () => {
-    if (!editingCashier) return;
-    if (!currentUser?.tenant_id) return;
-
-    try {
-      await updateUser(editingCashier.id, {
-        ...editingCashier,
-        tenant_id: currentUser.tenant_id,
-      });
-
-      setEditingCashier(null);
-      onCashierUpdate();
-    } catch (error) {
-      console.error("Error updating cashier:", error);
-      alert("Failed to update cashier.");
-    }
-  };
-
-  const handleDeleteCashier = async (cashierId: string) => {
-    if (!confirm("Delete this cashier? This cannot be undone.")) return;
-
-    try {
-      await deleteUser(cashierId);
-      onCashierUpdate();
-    } catch (error) {
-      console.error("Error deleting cashier:", error);
-      alert("Failed to delete cashier.");
-    }
-  };
-
+function CashierManagementTab({ cashiers }: { cashiers: any[] }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1782,15 +1761,9 @@ function CashierManagementTab({
             Cashier Management
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage cashiers for your restaurant
+            View cashiers for your restaurant
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-accent-orange text-white rounded-lg text-sm font-medium hover:bg-accent-hover"
-        >
-          + Add Cashier
-        </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -1800,7 +1773,6 @@ function CashierManagementTab({
               <th className="px-4 py-3">Cashier</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#e0e0e0]">
@@ -1824,163 +1796,21 @@ function CashierManagementTab({
                     Active
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setEditingCashier(cashier)}
-                      className="text-xs px-2 py-1 rounded-lg bg-blue-100 text-blue-600 font-medium hover:bg-blue-200"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCashier(cashier.id)}
-                      className="text-xs px-2 py-1 rounded-lg bg-red-100 text-red-600 font-medium hover:bg-red-200"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
               </tr>
             ))}
             {cashiers.length === 0 && (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={3}
                   className="px-4 py-8 text-center text-muted-foreground"
                 >
-                  No cashiers found. Add your first cashier to get started.
+                  No cashiers found.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-
-      {/* Add Cashier Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="font-heading font-semibold text-lg text-[#2c2c2c] mb-4">
-              Add New Cashier
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#2c2c2c] mb-1">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={newCashier.full_name}
-                  onChange={(e) =>
-                    setNewCashier({ ...newCashier, full_name: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg text-sm"
-                  placeholder="Enter cashier name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#2c2c2c] mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={newCashier.email}
-                  onChange={(e) =>
-                    setNewCashier({ ...newCashier, email: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg text-sm"
-                  placeholder="cashier@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#2c2c2c] mb-1">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={newCashier.password}
-                  onChange={(e) =>
-                    setNewCashier({ ...newCashier, password: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg text-sm"
-                  placeholder="Enter password"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 px-4 py-2 border border-[#e0e0e0] rounded-lg text-sm font-medium hover:bg-[#f5f5f5]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddCashier}
-                className="flex-1 px-4 py-2 bg-accent-orange text-white rounded-lg text-sm font-medium hover:bg-accent-hover"
-              >
-                Add Cashier
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Cashier Modal */}
-      {editingCashier && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="font-heading font-semibold text-lg text-[#2c2c2c] mb-4">
-              Edit Cashier
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#2c2c2c] mb-1">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={editingCashier.full_name}
-                  onChange={(e) =>
-                    setEditingCashier({
-                      ...editingCashier,
-                      full_name: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#2c2c2c] mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={editingCashier.email}
-                  disabled
-                  className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg text-sm bg-[#f5f5f5]"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Email cannot be changed
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setEditingCashier(null)}
-                className="flex-1 px-4 py-2 border border-[#e0e0e0] rounded-lg text-sm font-medium hover:bg-[#f5f5f5]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdateCashier}
-                className="flex-1 px-4 py-2 bg-accent-orange text-white rounded-lg text-sm font-medium hover:bg-accent-hover"
-              >
-                Update Cashier
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -212,10 +212,10 @@ export async function getDashboardStats(
 ): Promise<DashboardStats> {
   const supabase = getSupabase();
 
-  // Get orders for revenue calculation
+  // Get orders for revenue calculation (plain query, no joins)
   const { data: orders, error: ordersError } = await supabase
     .from("orders")
-    .select("total, payment_method, created_at")
+    .select("id, total, payment_method, created_at")
     .eq("tenant_id", tenantId)
     .eq("status", "completed");
 
@@ -274,21 +274,31 @@ export async function getDashboardStats(
     }),
   );
 
+  // Helper to get YYYY-MM-DD in local time
+  const getLocalDateString = (date: Date) => {
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+      .toISOString()
+      .split("T")[0];
+  };
+
   // Calculate daily revenue (last 14 days)
   const dailyRevenueMap = new Map<string, number>();
   const today = new Date();
   for (let i = 13; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = getLocalDateString(date);
     dailyRevenueMap.set(dateStr, 0);
   }
 
   orders?.forEach((order: any) => {
-    const dateStr = order.created_at?.split("T")[0];
-    if (dateStr && dailyRevenueMap.has(dateStr)) {
-      const current = dailyRevenueMap.get(dateStr) || 0;
-      dailyRevenueMap.set(dateStr, current + (order.total || 0));
+    if (order.created_at) {
+      const date = new Date(order.created_at);
+      const dateStr = getLocalDateString(date);
+      if (dailyRevenueMap.has(dateStr)) {
+        const current = dailyRevenueMap.get(dateStr) || 0;
+        dailyRevenueMap.set(dateStr, current + (order.total || 0));
+      }
     }
   });
 
@@ -296,8 +306,44 @@ export async function getDashboardStats(
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, amount]) => ({ date, amount }));
 
-  // Get top products (simplified - would need order_items data)
-  const topProducts: { name: string; qty: number; revenue: number }[] = [];
+  // Fetch order_items separately for top products calculation
+  let topProducts: { name: string; qty: number; revenue: number }[] = [];
+  const orderIds = orders?.map((o: any) => o.id) || [];
+
+  if (orderIds.length > 0) {
+    // Fetch order_items with product name from products table
+    const { data: allItems, error: itemsError } = await supabase
+      .from("order_items")
+      .select("*, products(name)")
+      .in("order_id", orderIds);
+
+    if (itemsError) {
+      console.error("Error fetching order_items:", itemsError);
+    }
+
+    if (allItems && allItems.length > 0) {
+      const productStatsMap = new Map<string, { qty: number; revenue: number }>();
+      allItems.forEach((item: any) => {
+        // Try product_name column first, then joined products.name, then fallback
+        const name = item.product_name || item.products?.name || "Unknown";
+        const qty = item.qty || item.quantity || 0;
+        const current = productStatsMap.get(name) || { qty: 0, revenue: 0 };
+        productStatsMap.set(name, {
+          qty: current.qty + qty,
+          revenue: current.revenue + (qty * (item.unit_price || 0)),
+        });
+      });
+
+      topProducts = Array.from(productStatsMap.entries())
+        .map(([name, stats]) => ({
+          name,
+          qty: stats.qty,
+          revenue: stats.revenue,
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+    }
+  }
 
   return {
     totalRevenue,

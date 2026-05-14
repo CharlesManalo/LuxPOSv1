@@ -29,6 +29,11 @@ module.exports = {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
+          orange: "#ff9e2c",
+          green: "#00c29f",
+        },
+        danger: {
+          red: "#ff4d4f",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",

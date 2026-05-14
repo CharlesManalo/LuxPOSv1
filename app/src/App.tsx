@@ -177,7 +177,9 @@ function ProtectedRoute({
       </div>
     );
   }
-  if (!userRole) return <Navigate to="/login" replace />;
+  // Don't redirect if userRole is undefined - this happens during auth state changes
+  if (userRole === null || userRole === undefined)
+    return <Navigate to="/login" replace />;
   if (!allowedRoles.includes(userRole)) {
     return <Navigate to={getRedirectPath(userRole)} replace />;
   }
